@@ -1,0 +1,14 @@
+    /* --main: #0E2F56;
+    --fColor: #ECECDA;
+    --subMain1: #118df0;
+    --subMain2: #FF304f; */
+
+        /* --main: #222831;
+    --fColor: #EEEEEE;
+    --subMain1: #393E46;
+    --subMain2: #00ADB5; */
+
+    /* --main: rgb(43, 46, 74);
+    --fColor: rgb(232, 69, 69);
+    --subMain1: rgb(144, 55, 73);
+    --subMain2: rgb(83, 53, 74); */

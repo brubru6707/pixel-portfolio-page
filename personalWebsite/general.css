@@ -1,0 +1,100 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Sans&family=Press+Start+2P&family=Rubik+Vinyl&display=swap');
+:root{
+    --reg: 'Fira Sans', sans-serif;
+    --pix: 'Press Start 2P', cursive;
+    --sca: 'Rubik Vinyl', cursive; 
+    --main: #0E2F56;
+    --fColor: #ECECDA;
+    --subMain1: #118df0;
+    --subMain2: #FF304f;
+
+        /* --main: #222831;
+    --fColor: #EEEEEE;
+    --subMain1: #393E46;
+    --subMain2: #00ADB5; */
+
+    /* --main: rgb(43, 46, 74);
+    --fColor: rgb(232, 69, 69);
+    --subMain1: rgb(144, 55, 73);
+    --subMain2: rgb(83, 53, 74); */
+}
+
+header{
+    z-index: 1;
+    --space: 20px;
+    width: 100vw;
+    padding-top: var(--space);
+    padding-bottom: var(--space);
+    border-bottom: 2px solid var(--fColor);
+    font-size: 10px;
+}
+
+body{
+    font-family: var(--reg);
+    background-color: var(--main);
+    color: var(--fColor);
+    padding: 0px;
+    margin: 0px;
+    overflow-x: hidden;
+}
+
+
+@keyframes fB1 {
+    from{
+        left: -100vw;
+    }
+    to{
+        left: 0vw;
+    }
+}
+
+@keyframes fB2 {
+    from{
+        left: 150vw;
+    }
+    to{
+        left: -50vw;
+    }
+}
+
+iframe{
+    border: 2px solid var(--fColor);
+}
+
+body::before{
+    content: " ";
+    background-color: var(--subMain1);
+    position: fixed;
+    z-index: -100;
+    clip-path: polygon(50% 50%, 0 0%, 0 100%);
+    height: 100vh;
+    width: 100vw;
+    animation: fB1 2s;
+}
+
+#background{
+    content: " ";
+    background-color: var(--subMain2);
+    position: fixed;
+    z-index: -99;
+    left: 150vw;
+    clip-path: polygon(100% 0%, 50% 50%, 100% 100%);
+    height: 100vh;
+    width: 150vw;
+    animation: fB2 3s ease-in-out 0.1s;
+    animation-fill-mode: forwards;
+}
+
+footer{
+    padding: 10px;
+    font-size: 20px;
+}
+
+::selection{
+    color: var(--main);
+    background-color: var(--fColor);
+}
+
+footer>b{
+    font-size: 1.2em;
+}
