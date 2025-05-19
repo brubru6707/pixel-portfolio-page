@@ -1,5 +1,45 @@
 let downF
 let downL
+let downP
+let downESC
+
+class IntroScene extends Phaser.Scene {
+    constructor() {
+        super('IntroScene');
+    }
+
+    preload() {
+        this.load.spritesheet('introAnim', 'assets/animation.png', {
+            frameWidth: 160,
+            frameHeight: 90
+        });
+    }
+
+    create() {
+        let scale = 0
+        if (window.innerWidth > window.innerHeight) {
+            scale = window.innerHeight / (90 * 1.2)
+        } else {
+            scale = window.innerWidth / (160 * 1.2)
+        }
+
+        this.anims.create({
+            key: 'playIntro',
+            frames: this.anims.generateFrameNumbers('introAnim', { start: 0, end: 13 }),
+            frameRate: 10, // adjust as needed
+            repeat: 0
+        });
+
+        const anim = this.add.sprite(this.cameras.main.centerX, this.cameras.main.centerY, 'introAnim')
+            .setOrigin(0.5)
+            .setScale(scale, scale) // scale to fill screen
+            .play('playIntro');
+
+        anim.on('animationcomplete', () => {
+            this.scene.start('MainScene');
+        });
+    }
+}
 
 class MainScene extends Phaser.Scene {
     constructor() {
@@ -9,48 +49,102 @@ class MainScene extends Phaser.Scene {
         this.canChop = true; // Cooldown flag for axe
         this.lastDirection = 'none'; // Track player's last direction
         this.miniMap = null
+        this.acceleration = 15;
+        this.maxSpeed = 1000;
+        this.friction = 0.9;
+        this.orbActivated = false;
+        this.zombieMoved = false
     }
 
     preload() {
         this.load.spritesheet('me', 'assets/me-sprite.png', { frameWidth: 13, frameHeight: 15 });
+        this.load.spritesheet('zombie', 'assets/zombie.png', { frameWidth: 13, frameHeight: 15 });
         this.load.image('tree', 'assets/tree.png');
         this.load.spritesheet('axe', 'assets/axe.png', { frameWidth: 12, frameHeight: 15 });
         this.load.spritesheet('computer', 'assets/computer.png', { frameWidth: 30, frameHeight: 26 });
         this.load.image('escKey', 'assets/esc-key.png');
+        this.load.image('fKey', 'assets/f-key.png');
+        this.load.image('plank', 'assets/plank.png');
+        this.load.spritesheet('orb', 'assets/orb.png', { frameWidth: 26, frameHeight: 30 });
+        this.load.spritesheet('ghost', 'assets/ghost.png', { frameWidth: 18, frameHeight: 30 });
+        this.load.spritesheet('hidden-bomb', 'assets/hidden-bomb.png', { frameWidth: 27, frameHeight: 15 });
+        this.load.spritesheet('explosive', 'assets/explosive.png', { frameWidth: 34, frameHeight: 40 });
     }
 
     create() {
         const worldWidth = 2000;
         const worldHeight = 2000;
+        const keySize = 2;
         
         this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
         this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
         
-        this.escKeySprite = this.add.image(0, 0, 'escKey')
-        .setScrollFactor(0)
-        .setVisible(false)
-        .setDepth(1000)
-        .setScale(3) // on top of everything   
-
-        // Add the computer in the center of the world
+        // Add objects in the center of the world
+        this.escKeySprite = this.add.image(0, 0, 'escKey').setScrollFactor(0).setVisible(false).setDepth(1000).setScale(keySize) // on top of everything   
+        this.fKeySprite = this.add.image(0, 0, 'fKey').setScrollFactor(0).setVisible(false).setDepth(1000).setScale(keySize) // on top of everything 
         this.computer = this.physics.add.staticSprite(worldWidth / 2, worldHeight / 2, 'computer', 0).setScale(15).refreshBody();
+        this.orb = this.physics.add.staticSprite(worldWidth / 1.2, worldHeight / 3.5, 'orb', 0).setScale(4).refreshBody();
+        this.player = this.physics.add.sprite(worldWidth / 2 - 250, worldHeight / 2, 'me', 0).setScale(3).refreshBody();
+        this.player.setCollideWorldBounds(true);
+        this.axe = this.physics.add.sprite(0, 0, 'axe', 0).setVisible(false).setScale(4).refreshBody();
+        this.zombie = this.physics.add.sprite(100, 100, 'zombie').setScale(3).refreshBody();
+        this.zombie.setCollideWorldBounds(true);
+        let signX = Math.random() < 0.5 ? -1 : 1
+        let signY = Math.random() < 0.5 ? -1 : 1
+        this.bombTile = this.physics.add.sprite(worldWidth / 2 + (150*(5*Math.random())*signX), worldHeight / 2 + (150*(5*Math.random())*signY), 'hidden-bomb').setImmovable(true).setScale(3).refreshBody();
 
-        // Computer blinking animation
+        // create animations
+        this.createAnimations.call(this, 'me');
+        this.createAnimations.call(this, 'zombie');
         this.anims.create({
             key: 'blink',
             frames: this.anims.generateFrameNumbers('computer', { start: 0, end: 1 }),
             frameRate: 2,
             repeat: -1
         });
+        this.anims.create({
+            key: 'aura',
+            frames: this.anims.generateFrameNumbers('orb', { start: 0, end: 4 }),
+            frameRate: 4,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'bomb-idle',
+            frames: this.anims.generateFrameNumbers('hidden-bomb', { start: 0, end: 3 }),
+            frameRate: 6,
+            repeat: -1
+          });
+        this.anims.create({
+            key: 'explode',
+            frames: this.anims.generateFrameNumbers('explosive', { start: 0, end: 3 }),
+            frameRate: 8,
+            repeat: 0
+          });
+        this.anims.create({
+            key: 'ghost_float',
+            frames: this.anims.generateFrameNumbers('ghost', { start: 0, end: 2 }),
+            frameRate: 5,
+            repeat: -1,
+        });
+          
+        // play animations 
+        this.orb.anims.play('aura');
         this.computer.anims.play('blink');
+        this.zombie.anims.play('idle');
+        this.bombTile.anims.play("bomb-idle")
 
-        // Track computer chopping
+        // Call this periodically
+        this.time.addEvent({
+            delay: 10000, // every 10 seconds (adjust as needed)
+            callback: () => this.spawnGhost(),
+            callbackScope: this,
+            loop: true
+        });
+
+        // Init object variables
         this.computerChops = 0;
-
-        // Create player
-        this.player = this.physics.add.sprite(worldWidth / 2 - 250, worldHeight / 2, 'me', 0);
-        this.player.setScale(3);
-        this.player.setCollideWorldBounds(true);
+        this.orbChops = 0;
+        this.zombie.direction = null;
 
         // Spawn trees without overlap
         this.trees = this.physics.add.staticGroup();
@@ -64,7 +158,6 @@ class MainScene extends Phaser.Scene {
                 this.trees.getChildren().forEach(tree => {
                     if (Phaser.Math.Distance.Between(x, y, tree.x, tree.y) < 80) {
                         overlap = true;
-                        console.log("true")
                     }
                 });
             } while (overlap);
@@ -81,77 +174,41 @@ class MainScene extends Phaser.Scene {
             }
         });
 
-        // Add collision between player and trees
+        // Make sure trees don't spawn on the orb
+        this.trees.getChildren().forEach(tree => {
+            if (Phaser.Math.Distance.Between(tree.x, tree.y, this.orb.x, this.orb.y) < 150) {
+                tree.destroy();
+            }
+        });
+
+        // Add collision between player and some objects
         this.physics.add.collider(this.player, this.trees);
-
-        // Add collision between player and the computer
         this.physics.add.collider(this.player, this.computer);
+        this.physics.add.collider(this.player, this.orb);
+        this.physics.add.overlap(this.player, this.bombTile, this.triggerExplosion, null, this);
 
-
-        // Axe setup 
-        this.axe = this.physics.add.sprite(0, 0, 'axe', 0).setVisible(false).setScale(4).refreshBody();
-
-        // Create animations
-        this.anims.create({
-            key: 'idle',
-            frames: [{ key: 'me', frame: 0 }],
-            frameRate: 1,
-            repeat: -1
-        });
-
-        this.anims.create({
-            key: 'right',
-            frames: this.anims.generateFrameNumbers('me', { start: 1, end: 4 }),
-            frameRate: 10,
-            repeat: -1
-        });
-
-        this.anims.create({
-            key: 'left',
-            frames: this.anims.generateFrameNumbers('me', { start: 5, end: 8 }),
-            frameRate: 10,
-            repeat: -1
-        });
-
-        this.anims.create({
-            key: 'up',
-            frames: this.anims.generateFrameNumbers('me', { start: 9, end: 13 }),
-            frameRate: 10,
-            repeat: -1
-        });
-
-        this.anims.create({
-            key: 'down',
-            frames: this.anims.generateFrameNumbers('me', { start: 14, end: 17 }),
-            frameRate: 10,
-            repeat: -1
-        });
 
         // Keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
         this.cameras.main.startFollow(this.player);
         downF = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
         downL = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
-        
+        downP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+        downESC = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
         // Overlap detection instead of collider for axe
         this.physics.add.overlap(this.axe, this.trees, this.cutTree, null, this);
-        this.physics.add.overlap(this.axe, this.computer, this.hitComputer, null, this);
+        this.physics.add.overlap(this.axe, this.computer, this.hitComputer, null, this);        
+        this.physics.add.overlap(this.axe, this.orb, this.hitOrb, null, this);        
 
-        this.physics.add.overlap(this.player, this.computer, () => {
-            this.showEscPrompt();
-        }, null, this);        
-
-        // Mini map camera
+        // Mini map camera 
         const miniMapWidth = 150
         this.miniMap = this.cameras.add(
             window.innerWidth - miniMapWidth - 20,
             20,
             150,
             150
-        ).setZoom(0.1)
-         .startFollow(this.player, true, 0.1, 0.1)
-         .setBackgroundColor(0x002244)
-         .setBounds(0, 0, worldWidth, worldHeight);
+        ).setZoom(0.1).startFollow(this.player, true, 0.1, 0.1).setBackgroundColor(0x002244).setBounds(0, 0, worldWidth, worldHeight);
 
          this.logText = this.add.text(
             this.cameras.main.width / 2, 
@@ -185,14 +242,14 @@ class MainScene extends Phaser.Scene {
             this.computerIframe.style.pointerEvents = 'none';
             document.body.appendChild(this.computerIframe);
         }, [], this);
-
-        
     }
 
     update() {
-        const speed = 100;
         const player = this.player;
         const cursors = this.cursors;
+        // Get current velocity
+        let velX = this.player.body.velocity.x;
+        let velY = this.player.body.velocity.y;
 
         if (this.lastDirection == "none") { 
             this.trees.getChildren().forEach(tree => {
@@ -200,29 +257,56 @@ class MainScene extends Phaser.Scene {
                     tree.destroy();
                 }
             });
+
+            this.trees.getChildren().forEach(tree => {
+                if (Phaser.Math.Distance.Between(tree.x, tree.y, this.orb.x, this.orb.y) < 150) {
+                    tree.destroy();
+                }
+            });
         }
 
-        player.setVelocity(0);
+        // Input
+        if (this.cursors.left.isDown) {
+            velX -= this.acceleration;
+        } else if (this.cursors.right.isDown) {
+            velX += this.acceleration;
+        }
+
+        if (this.cursors.up.isDown) {
+            velY -= this.acceleration;
+        } else if (this.cursors.down.isDown) {
+            velY += this.acceleration;
+        }
+
+        // Apply friction if no key is pressed
+        if (!this.cursors.left.isDown && !this.cursors.right.isDown) {
+            velX *= this.friction;
+        }
+        if (!this.cursors.up.isDown && !this.cursors.down.isDown) {
+            velY *= this.friction;
+        }
+
+        // Cap velocity
+        velX = Phaser.Math.Clamp(velX, -this.maxSpeed, this.maxSpeed);
+        velY = Phaser.Math.Clamp(velY, -this.maxSpeed, this.maxSpeed);
+
+        // Apply new velocity
+        this.player.setVelocity(velX, velY);
 
         if (cursors.left.isDown) {
-            player.setVelocityX(-speed);
-            player.anims.play('left', true);
+            player.play('left-me', true);
             this.lastDirection = 'left';
         } else if (cursors.right.isDown) {
-            player.setVelocityX(speed);
-            player.anims.play('right', true);
+            player.play('right-me', true);
             this.lastDirection = 'right';
         } else if (cursors.up.isDown) {
-            player.setVelocityY(-speed);
-            player.anims.play('up', true);
+            player.play('up-me', true);
             this.lastDirection = 'up';
         } else if (cursors.down.isDown) {
-            player.setVelocityY(speed);
-            player.anims.play('down', true);
+            player.play('down-me', true);
             this.lastDirection = 'down';
-        } else {
-            player.anims.play('idle', true);
-        }
+        } else
+            player.play('idle-me', true);
 
         // Axe positioning
         if (downF.isDown) {
@@ -245,18 +329,6 @@ class MainScene extends Phaser.Scene {
             this.axe.setVisible(false);
             this.axe.setPosition(0,0)
         }
-
-        const distToComputer = Phaser.Math.Distance.Between(
-            this.player.x, this.player.y,
-            this.computer.x, this.computer.y
-        );
-        
-        if (distToComputer < 250) { // tweak as needed
-            this.showEscPrompt();
-        } else {
-            this.escKeySprite.setVisible(false);
-        }
-        
         
         // Update iframe position relative to the computer sprite
         if (this.computer && this.computerIframe) {
@@ -281,6 +353,58 @@ class MainScene extends Phaser.Scene {
             this.computerIframe.style.left = `${iframeLeft - scaledOffsetX}px`;
             this.computerIframe.style.top = `${iframeTop - scaledOffsetY}px`;
         }
+
+        const computerDistanceX = Math.abs(this.player.x-this.computer.getCenter().x)
+        const computerDistanceY = Math.abs(this.player.y-this.computer.getCenter().y)
+        const orbDistanceX = Math.abs(this.player.x-this.orb.getCenter().x)
+        const orbDistanceY = Math.abs(this.player.y-this.orb.getCenter().y)
+
+        let holdFRules = (computerDistanceX < 250 && computerDistanceY < 240) || (orbDistanceX < 150 && orbDistanceY < 150 )
+
+        if (holdFRules) {  // ← adjust this range as needed
+            if (this.orbActivated) {
+                this.setLog("","")
+                this.setLog("", "holdESC")
+            } else
+                this.setLog("", "holdF")
+        } else {
+            this.setLog("", "")
+        }
+
+        // Periodically update direction
+        if (this.zombieMoved == false) {
+            this.zombieMoved = true
+            const directions = ['left', 'right', 'up', 'down'];
+            this.zombie.direction = Phaser.Math.RND.pick(directions);
+            this.time.delayedCall(2000, () => { 
+                this.zombieMoved = false
+            }, [], this); 
+        }
+
+        const speed = 50;
+        switch (this.zombie.direction) {
+            case 'left':
+                this.zombie.setVelocity(-speed, 0);
+                this.zombie.anims.play('left-zombie', true);
+                break;
+            case 'right':
+                this.zombie.setVelocity(speed, 0);
+                this.zombie.anims.play('right-zombie', true);
+                break;
+            case 'up':
+                this.zombie.setVelocity(0, -speed);
+                this.zombie.anims.play('up-zombie', true);
+                break;
+            case 'down':
+                this.zombie.setVelocity(0, speed);
+                this.zombie.anims.play('down-zombie', true);
+                break;
+            default:
+                this.zombie.setVelocity(0, 0);
+                this.zombie.anims.play('idle-zombie', true);
+                break;
+        }
+
     }
 
     cutTree(axe, tree) {
@@ -296,7 +420,6 @@ class MainScene extends Phaser.Scene {
             onComplete: () => {
                 tree.destroy();
                 this.logs += 1;
-                this.setLog('Tree chopped! Logs: ' + this.logs);
             }
         });
         
@@ -308,32 +431,31 @@ class MainScene extends Phaser.Scene {
     
     }
 
-    showEscPrompt() {
-        console.log("sow esc")
-        if (!this.escKeySprite.visible) {
-            this.escKeySprite.setVisible(true);
-            this.escKeySprite.setPosition(this.cameras.main.width / 2 + 30, this.cameras.main.height - 40);
-    
-            this.setLog('Hold');
-            this.time.delayedCall(500, () => {
-                this.setLog('Hold    to interact'); // spacing leaves room for sprite
-            });
-    
-            // Re-show text + sprite if camera moves (optional)
-            this.escKeySprite.setScrollFactor(0);
+    setLog(message, priority) {
+        this.logText.setVisible(false)
+        switch (priority) {
+            case ("holdESC"):
+                this.escKeySprite.setVisible(true);
+                this.escKeySprite.setPosition(this.cameras.main.width / 2 + 80, this.cameras.main.height - 40);
+                this.logText.setVisible(true)
+                this.logText.setText("Hold ").setScale(2);
+                this.escKeySprite.setScrollFactor(0);
+                break
+            case ("holdF"):
+                this.fKeySprite.setVisible(true);
+                this.fKeySprite.setPosition(this.cameras.main.width / 2 + 80, this.cameras.main.height - 40);
+                this.logText.setVisible(true)
+                this.logText.setText("Hold ").setScale(2);
+                this.fKeySprite.setScrollFactor(0);
+                break
+            default: 
+                console.log("invi")
+                this.logText.setVisible(false)
+                this.escKeySprite.setVisible(false);
+                this.fKeySprite.setVisible(false);
         }
-    }
-    
+            
 
-    setLog(message) {
-        if (this.logText) {
-            this.logText.setText(message);
-    
-            // Optional: after 2 seconds, clear the log automatically
-            this.time.delayedCall(2000, () => {
-                this.logText.setText('');
-            }, [], this);
-        }
     }
     
     hitComputer(axe, computer) {
@@ -346,9 +468,7 @@ class MainScene extends Phaser.Scene {
             x: { value: computer.x + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
             y: { value: computer.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
             onComplete: () => {
-                this.computerChops++;
-                this.setLog('Computer hit! Hits: ' + this.computerChops);
-    
+                this.computerChops++;    
                 if (this.computerChops >= 3) {
                     this.enterWebsiteMode();
                 }
@@ -361,6 +481,7 @@ class MainScene extends Phaser.Scene {
     }
     
     enterWebsiteMode() {
+        this.setLog("holdESC", "holdESC")
         this.scene.pause();
         this.game.canvas.style.display = 'none';
         document.body.style.overflow = 'scroll';
@@ -378,10 +499,13 @@ class MainScene extends Phaser.Scene {
         iframe.style.zIndex = '1000';
     
         document.body.appendChild(iframe);
-    
-        // ESC key handling
+
+        window.addEventListener('keydown', (e) => {
+            iframe.contentWindow.postMessage('INFORM USER', '*');
+        });
 
         const escHandler = (event) => {
+            console.log("this i")
             if (event.code === "Escape") {
                 iframe.remove();
                 this.game.canvas.style.display = 'block';
@@ -404,6 +528,135 @@ class MainScene extends Phaser.Scene {
         document.addEventListener('keydown', escHandler);
     }
     
+    spawnGhost() {
+        const x = Phaser.Math.Between(0, this.cameras.main.width);
+        const y = Phaser.Math.Between(0, this.cameras.main.height);
+      
+        const ghost = this.add.sprite(x, y, 'ghost').setAlpha(0.5).setScale(3);
+        ghost.play('ghost_float');
+      
+        this.time.delayedCall(5000, () => {
+          // Fade out over 2 seconds
+          this.tweens.add({
+            targets: ghost,
+            alpha: 0,
+            duration: 2000,
+            onComplete: () => ghost.destroy()
+          });
+        });
+    }
+    
+    triggerExplosion(player, bomb) {
+        bomb.disableBody(true, true); // hide & disable bomb
+      
+        const explosion = this.add.sprite(bomb.x, bomb.y, 'explosive').setScale(3);
+        explosion.play('explode');
+      
+        // Optional knockback: apply velocity based on position
+        const knockbackForce = 1000;
+        const dx = player.x - bomb.x;
+        const dy = player.y - bomb.y;
+        const angle = Math.atan2(dy, dx);
+        const vx = Math.cos(angle) * knockbackForce;
+        const vy = Math.sin(angle) * knockbackForce;
+      
+        player.body.velocity.x = vx;
+        player.body.velocity.y = vy;
+      
+        // Remove explosion sprite after animation completes
+        explosion.on('animationcomplete', () => {
+          explosion.destroy();
+        });
+    }
+      
+    hitOrb(axe, orb) {
+        if (!this.canChop) return;
+        this.canChop = false;
+    
+        // Shake the computer randomly
+        this.tweens.add({
+            targets: orb,
+            x: { value: orb.x + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            y: { value: orb.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            onComplete: () => {
+                this.orbChops++;    
+                if (this.orbChops >= 3) {
+                    this.orbActivated = true
+                    this.setLog("","")
+                    this.setLog("", "holdESC")
+                    let title = "hello there"
+                    let description = "what even is this"
+                    let videoUrl = "lalalalalalal"
+                    this.enterModal(title, description, videoUrl)
+                }
+            }
+        });
+    
+        this.time.delayedCall(500, () => { 
+            this.canChop = true; 
+        }, [], this); 
+    }
+
+    enterModal(title, description, videoUrl) {
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-description').textContent = description;
+        document.getElementById('modal-video').src = videoUrl;
+        document.getElementById('project-modal').style.display = 'flex';
+
+        // Show escKeySprite in a fixed position
+        this.escKeySprite.setVisible(true);
+        this.escKeySprite.setScrollFactor(0);
+        this.escKeySprite.setPosition(this.cameras.main.width / 2 + 80, this.cameras.main.height - 40);
+
+        this.scene.pause(); // Pause game logic
+
+        window.addEventListener('keydown', (e) => {
+            if(e.code == "Escape")
+                this.hideProjectModal()
+        });
+    }
+
+    hideProjectModal() {
+        this.orbActivated = false
+        document.getElementById('modal-video').src = '';
+        document.getElementById('project-modal').style.display = 'none';
+        this.escKeySprite.setVisible(false);
+        this.scene.resume(); // Resume game logic
+    }
+    
+    createAnimations(textureKey) {
+        this.anims.create({
+          key: `idle-${textureKey}`,
+          frames: [{ key: textureKey, frame: 0 }],
+          frameRate: 1,
+          repeat: -1
+        });
+        this.anims.create({
+          key: `right-${textureKey}`,
+          frames: this.anims.generateFrameNumbers(textureKey, { start: 1, end: 4 }),
+          frameRate: 10,
+          repeat: -1
+        });
+        this.anims.create({
+          key: `left-${textureKey}`,
+          frames: this.anims.generateFrameNumbers(textureKey, { start: 5, end: 8 }),
+          frameRate: 10,
+          repeat: -1
+        });
+        this.anims.create({
+          key: `up-${textureKey}`,
+          frames: this.anims.generateFrameNumbers(textureKey, { start: 9, end: 13 }),
+          frameRate: 10,
+          repeat: -1
+        });
+        this.anims.create({
+          key: `down-${textureKey}`,
+          frames: this.anims.generateFrameNumbers(textureKey, { start: 14, end: 17 }),
+          frameRate: 10,
+          repeat: -1
+        });
+    }
+      
 }
 
 // Game config
@@ -414,11 +667,10 @@ const config = {
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 0 },
             debug: false
         }
     },
-    scene: MainScene,
+    scene: [IntroScene, MainScene],
     pixelArt: true
 };
 
@@ -428,9 +680,7 @@ const game = new Phaser.Game(config);
 // Handle window resize
 window.addEventListener('resize', () => {
     game.scale.resize(window.innerWidth, window.innerHeight);
-
-    this.scene.get('MainScene').update(); // Or call your custom positioning logic here
-
+    game.scene.getScene('MainScene').update();
     if (game.scene.keys.MainScene) {
         const scene = game.scene.keys.MainScene;
         

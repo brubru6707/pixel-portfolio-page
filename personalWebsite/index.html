@@ -72,6 +72,8 @@ body::before{
     height: 100vh;
     width: 100vw;
     animation: fB1 2s;
+    margin: 0px;
+    padding: 0px;
 }
 
 #background{
@@ -412,6 +414,45 @@ body.is-mobile {
     margin-bottom: var(--space);
 }
 
+#escButton-holder {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    width: 150px;
+    bottom: 25px;
+    left: calc(50vw - 75px);
+    z-index: 1001;
+    backdrop-filter: blur(1px);
+    border-radius: 100px;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.3); /* Optional dark tint */
+    visibility: hidden; 
+}
+#escButton-text {
+    font-size: 20px;
+    color: white;
+    width: 50%;
+}
+
+#escButton {
+    display: flex;
+    align-items: start;
+    justify-content: end;
+    width: 50%;
+}
+
+#escButton-image {
+    transform: scale(3);
+    width: 32px; /* sprite native width */
+    height: 16px; /* sprite native height */
+    background-image: url('/assets/esc-key.png');
+    background-repeat: no-repeat;
+    background-size: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+
 </style>
 </head>
 <body>
@@ -541,6 +582,7 @@ body.is-mobile {
       <p id="modal-description"></p>
     </div>
     </div>
+    <div id="escButton-holder"><div id="escButton-text">Hold</div> <div id="escButton"><div id="escButton-image"></div></div></div>
     <footer>
         <script>
         const observer = new IntersectionObserver((entries) => {
@@ -563,6 +605,13 @@ body.is-mobile {
                 window.parent.postMessage('ESCAPE_PRESSED', '*');
             }
         });
+
+        window.addEventListener('message', (event) => {
+            if (event.data === 'INFORM USER') {
+                document.getElementById('escButton-holder').style.visibility = 'visible';
+            }
+        });
+
 
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (isMobile) {
@@ -594,16 +643,16 @@ body.is-mobile {
             modalDescription.textContent = description;
             modal.style.display = 'flex'; // Show modal
             document.body.classList.add('modal-open'); // Disable scrolling
-            }
+        }
 
-            function closeModal() {
+        function closeModal() {
             const modal = document.getElementById('modal');
             modal.style.display = 'none'; // Hide modal
             document.body.classList.remove('modal-open'); // Re-enable scrolling
-            }
+        }
 
-            // Close modal if clicked outside content
-            window.onclick = function(event) {
+        // Close modal if clicked outside content
+        window.onclick = function(event) {
             const modal = document.getElementById('modal');
             if (event.target === modal) {
                 closeModal();

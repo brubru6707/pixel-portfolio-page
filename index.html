@@ -7,17 +7,62 @@
     <style>
         body { margin: 0; }
         canvas { display: block; }
-            body {
-        margin: 0;
-        overflow:hidden;
-            }
-            canvas {
+        body {
+            margin: 0;
+            overflow:hidden;
+        }
+        canvas {
                 display: block;
-            }
+        }
+        #project-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            /* backdrop-filter: blur(6px); */
+            /* background-color: rgba(0, 0, 0, 0.4); */
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Press Start 2P', monospace;
+            image-rendering: pixelated;
+        }
+
+        .modal-content {
+            background: #111;
+            padding: 20px;
+            border: 2px solid white;
+            text-align: center;
+            max-width: 90vw;
+            box-shadow: 0 0 10px white;
+            color: white;
+        }
+
+        .modal-content h1,
+        .modal-content p {
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .modal-content iframe {
+            max-width: 100%;
+            height: auto;
+            border: none;
+        }
+
     </style>
 </head>
 <body>
-
+    <div id="project-modal" style="display: none;">
+        <div class="modal-content">
+          <h1 id="modal-title">Project Title</h1>
+          <p id="modal-description">Project description here...</p>
+          <iframe id="modal-video" width="320" height="180" src="" frameborder="0" allowfullscreen></iframe>
+        </div>
+      </div>
+      
     <!-- Load Phaser first -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
 
