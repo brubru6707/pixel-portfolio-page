@@ -272,7 +272,7 @@ class MainScene extends Phaser.Scene {
         // Calculate distance between tree and the users
         playerNearTree = false
         this.trees.getChildren().forEach(tree => {
-            if (Phaser.Math.Distance.Between(tree.x, tree.y, this.player.x, this.player.y) < 150) { 
+            if (Phaser.Math.Distance.Between(tree.x, tree.y, this.player.x, this.player.y) < 80) { 
                 playerNearTree = true;
             }
         });
@@ -410,7 +410,9 @@ class MainScene extends Phaser.Scene {
         }
 
         // Axe positioning
-        if ((downF.isDown || this.activateAxe) && this.mobilePlayerMove) {
+        let desktopAxeActivationReq = (downF.isDown || this.activateAxe) && !this.isLikelyMobileDevice()
+        let mobileAxeActivationReq = this.activateAxe && this.isLikelyMobileDevice() && this.mobilePlayerMove
+        if (desktopAxeActivationReq || mobileAxeActivationReq) {
             this.axeRotations += this.axeRotations < 0.5 ? this.axeRotations * 1.01 + 0.01 : 0.5;
             let variableOffsetChange = 10          
             if (this.lastDirection == "left") {
