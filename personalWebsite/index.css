@@ -1,0 +1,513 @@
+/* @import url('https://fonts.googleapis.com/css2?family=Fira+Sans&family=Press+Start+2P&family=Rubik+Vinyl&display=swap'); */
+@import url('https://fonts.googleapis.com/css2?family=Jersey+10&display=swap');
+:root{
+    --main: black;
+    --fColor: #ECECDA;
+    --subMain1: #296B1C;
+    --subMain2: #882626;
+    --borderRad: 15px; 
+    --space: 150px;
+    --pix: "Jersey 10", sans-serif;
+}
+
+header{
+    z-index: 1;
+    --space: 20px;
+    width: 100vw;
+    padding-top: var(--space);
+    padding-bottom: var(--space);
+    border-bottom: 2px solid var(--fColor);
+    position: fixed;
+    display: flex;
+    height: 40px;
+    flex-flow: row nowrap;
+    justify-content: start;
+    align-items: center;
+}
+
+body{
+    background-color: var(--main);
+    color: var(--fColor);
+    padding: 0px;
+    margin: 0px;
+    overflow-x: hidden;
+    line-height: 2em;
+    font-family: var(--pix);
+    font-size: 1.5em;
+}
+
+@keyframes fB1 {
+    from{
+        left: -100vw;
+    }
+    to{
+        left: 0vw;
+    }
+}
+
+@keyframes fB2 {
+    from{
+        left: 150vw;
+    }
+    to{
+        left: -50vw;
+    }
+}
+
+/* iframe{
+    border: 2px solid var(--fColor);
+} */
+
+body::before{
+    content: " ";
+    background-color: var(--subMain1);
+    position: fixed;
+    z-index: -100;
+    clip-path: polygon(50% 50%, 0 0%, 0 100%);
+    height: 100vh;
+    width: 100vw;
+    animation: fB1 2s;
+    margin: 0px;
+    padding: 0px;
+}
+
+#background{
+    content: " ";
+    background-color: var(--subMain2);
+    position: fixed;
+    z-index: -99;
+    left: 150vw;
+    clip-path: polygon(100% 0%, 50% 50%, 100% 100%);
+    height: 100vh;
+    width: 150vw;
+    animation: fB2 3s ease-in-out 0.1s;
+    animation-fill-mode: forwards;
+    position: fixed;
+}
+
+footer{
+    width: 100vw;
+    background-color: black;
+    padding: 10px;
+    
+}
+
+::selection{
+    color: var(--main);
+    background-color: var(--fColor);
+}
+
+#title-name{
+    --space: 20px;
+    font-size: 2em;
+    padding-left: var(--space);
+    padding-right: var(--space);
+}
+
+#title-info-years{
+    font-size: 0.8em;
+}
+
+#title-info{
+    color: var(--fColor);
+    display: flex;
+    flex-flow: column-reverse nowrap;
+    font-size: 1em;
+}
+
+/*=====================pageChoice=====================*/
+
+#intro-holder{
+    background-color: var(--main);
+    border-radius: var(--borderRad);
+    height: fit-content;
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--fColor);
+    width: 50vw;
+    margin-left: 25vw;
+    --pad: 20px;
+    padding-top: var(--pad);
+    padding-bottom: var(--pad); 
+    font-size: 1.3em;
+}
+
+#intro-holder>div{
+    width: 80%;
+}
+
+#intro-name>b{
+    color: var(--subMain1);
+}
+
+#intro-des>b{
+    color: var(--subMain2);
+}
+
+#intro-name{
+    margin-bottom: 20px;
+}
+
+/* ============================projects======================== */
+
+#proj  {
+  display: flex;
+  flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
+  justify-content: center; /* Centers project sections horizontally */
+  align-items: center;
+  flex-flow: row ;
+  height: fit-content;
+  width: 100vw;
+}
+
+#proj-header {
+    width: 100vw;
+    text-align: center;
+}
+
+/* Individual project sections (Software, Robotics) */
+#proj-software, #proj-robotics {
+  display: flex;
+  justify-content: center; /* Centers project sections horizontally */
+  flex-direction: row;
+  width: 50%;
+  height: 100%;
+
+}
+
+/* Title for each project section */
+.proj-topic {
+  width: 20%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.4em;
+}
+
+.proj-example-shelf {
+    display: flex;
+    flex-flow: row;
+}
+
+/* Container for project examples */
+.proj-examples {
+  width: 80%;
+  display: flex;
+  flex-flow: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Individual project example */
+.proj-example {
+  background-color: black; /* Very light gray */
+  padding: 10px;
+  border-radius: var(--borderRad);
+  font-size: 1em;
+  border: 2px solid var(--fColor);
+  --varSize: 150px;
+  width: calc(var(--varSize));
+  height: calc(var(--varSize) - 50px);
+  margin: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.proj-example:hover {
+    cursor: pointer;
+    transform: scale(1.2);
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Card Styling */
+.card-container {
+  display: flex;
+  gap: 20px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+/* Modal Styling */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed;
+  top: 0;
+  left: 0;
+  color: black;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7); /* Blur effect */
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: var(--fColor);
+  padding: 30px;
+  border-radius: 10px;
+  max-width: 600px;
+  width: 80%;
+  position: relative;
+}
+
+#modal-video {
+  width: 100%;
+  max-width: 560px;
+  height: 315px;
+  margin: 20px 0;
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  #modal-video {
+    height: calc(315px * 0.75);
+  }
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+/* Prevent scrolling when modal is open */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* ======================================= */
+
+#school-holder {
+    display: grid;
+  grid-template-columns: auto auto; /* Auto-width columns */
+  justify-content:space-around; /* Pushes elements to opposite sides */
+}
+
+#edu-holder, #awards-holder{
+    background-color: var(--main);
+    border-radius: var(--borderRad);
+    height: fit-content;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--fColor);
+    --pad: 20px;
+    padding-top: var(--pad);
+    padding-bottom: var(--pad); 
+    padding: 10px;
+    width: 500px
+}
+
+/* =========================================== */
+
+#social-holder {
+    display: flex;
+    flex-flow: row;
+    width: 100vw;
+}
+
+#social-header {
+    width: 20%;
+    text-align: end;
+}
+
+#social-socials {
+    width: 80%;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: center; /* Centers children horizontally */
+    gap: 10%; /* Optional: Adds space between flex items */
+}
+
+.social-social {
+    background-color: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.social-social:hover {
+    cursor: pointer;
+    transform: scale(1.2);
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Media query for responsiveness */
+@media screen and (max-width: 1110px) {
+    #school-holder {
+        display: grid;
+        grid-template-columns: 1fr; /* Single column (vertical stack) */
+        grid-auto-rows: auto; /* Each child gets its own row */
+        gap: 20px; /* Spacing between stacked items */
+        
+    }
+
+    #edu-holder, #awards-holder{
+        margin: auto;
+    }
+}
+
+@media screen and (max-width: 860px) {
+    #proj  {
+        display: flex;
+        flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
+        justify-content: center; /* Centers project sections horizontally */
+        align-items: center;
+        flex-flow: column ;
+        height: fit-content;
+        width: 100vw;
+        margin-bottom: 100px;
+    }
+    .proj-example {
+        background-color: black; /* Very light gray */
+        padding: 10px;
+        border-radius: var(--borderRad);
+        font-size: 1em;
+        border: 2px solid var(--fColor);
+        --varSize: 150px;
+        width: calc(var(--varSize));
+        height: calc(var(--varSize) - 50px);
+        margin: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+
+    #edu-holder, #awards-holder{
+        margin: auto;
+        width: 300px;
+        margin-bottom: 100px;
+    }
+
+    #title-name {
+        font-size: 1em;
+    }
+
+    #title-info {
+        font-size: 1em;
+    }
+
+    #escButton-holder {
+        right: 10px;
+    }
+
+    #intro-holder{ 
+        width: 90vw;
+        margin-left: 5vw;
+    }
+}
+
+body.is-mobile {
+  font-size: 1.1em;
+}
+
+.hidden{
+    opacity: 0;
+    filter: blur(5px);
+    transform: translateX(-100%);
+    transition: all 1s;
+}
+
+.show{
+    filter: blur(0);
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.space {
+    margin-top: var(--space);
+    margin-bottom: var(--space);
+}
+
+#escButton-holder {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    /* bottom: 25px;
+    left: 50vw; */
+    top: 30px;
+    right: 25px;
+    z-index: 1001;
+    backdrop-filter: blur(1px);
+    border-radius: 100px;
+    background-color: rgba(0, 0, 0, 0.3); /* Optional dark tint */
+    visibility: hidden; 
+}
+#escButton-text {
+    font-size: 20px;
+    color: white;
+    width: 50%;
+}
+
+#escButton {
+    display: flex;
+    align-items: start;
+    justify-content: end;
+    width: 50%;
+}
+
+#escButton-image {
+    transform: scale(3.7);
+    width: 32px; /* sprite native width */
+    height: 16px; /* sprite native height */
+    background-image: url('/assets/esc-key.png');
+    background-repeat: no-repeat;
+    background-size: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.social-container {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.social-link {
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s;
+}
+
+.social-link:hover {
+  transform: translateY(-3px);
+}
+
+.social-social {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.social-social:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.social-icon {
+  width: 40px;
+  height: 40px;
+}

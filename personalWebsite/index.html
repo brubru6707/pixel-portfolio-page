@@ -1,459 +1,7 @@
 <!DOCTYPE html>
 <head>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Fira+Sans&family=Press+Start+2P&family=Rubik+Vinyl&display=swap');
-:root{
-    --reg: 'Fira Sans', sans-serif;
-    --main: black;
-    --fColor: #ECECDA;
-    --subMain1: #296B1C;
-    --subMain2: #882626;
-    --borderRad: 15px; 
-    --space: 150px;
-    --pix: 'Press Start 2P', cursive;
-}
-
-header{
-    z-index: 1;
-    --space: 20px;
-    width: 100vw;
-    padding-top: var(--space);
-    padding-bottom: var(--space);
-    border-bottom: 2px solid var(--fColor);
-    font-size: 10px;
-    position: fixed;
-    display: flex;
-    height: 40px;
-    flex-flow: row nowrap;
-    justify-content: start;
-    align-items: center;
-}
-
-body{
-    font-family: var(--reg);
-    background-color: var(--main);
-    color: var(--fColor);
-    padding: 0px;
-    margin: 0px;
-    overflow-x: hidden;
-    line-height: 2em;
-    font-size: 10px;
-    font-family: var(--pix);
-}
-
-@keyframes fB1 {
-    from{
-        left: -100vw;
-    }
-    to{
-        left: 0vw;
-    }
-}
-
-@keyframes fB2 {
-    from{
-        left: 150vw;
-    }
-    to{
-        left: -50vw;
-    }
-}
-
-/* iframe{
-    border: 2px solid var(--fColor);
-} */
-
-body::before{
-    content: " ";
-    background-color: var(--subMain1);
-    position: fixed;
-    z-index: -100;
-    clip-path: polygon(50% 50%, 0 0%, 0 100%);
-    height: 100vh;
-    width: 100vw;
-    animation: fB1 2s;
-    margin: 0px;
-    padding: 0px;
-}
-
-#background{
-    content: " ";
-    background-color: var(--subMain2);
-    position: fixed;
-    z-index: -99;
-    left: 150vw;
-    clip-path: polygon(100% 0%, 50% 50%, 100% 100%);
-    height: 100vh;
-    width: 150vw;
-    animation: fB2 3s ease-in-out 0.1s;
-    animation-fill-mode: forwards;
-    position: fixed;
-}
-
-footer{
-    width: 100vw;
-    background-color: black;
-    padding: 10px;
-    
-}
-
-::selection{
-    color: var(--main);
-    background-color: var(--fColor);
-}
-
-#title-name{
-    --space: 20px;
-    font-size: 2em;
-    padding-left: var(--space);
-    padding-right: var(--space);
-}
-
-#title-info-years{
-    font-size: 0.8em;
-}
-
-#title-info{
-    color: var(--fColor);
-    display: flex;
-    flex-flow: column-reverse nowrap;
-    font-size: 1em;
-}
-
-/*=====================pageChoice=====================*/
-
-#intro-holder{
-    background-color: var(--main);
-    border-radius: var(--borderRad);
-    height: fit-content;
-    display: flex;
-    flex-flow: column nowrap;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--fColor);
-    width: 50vw;
-    margin-left: 25vw;
-    --pad: 20px;
-    padding-top: var(--pad);
-    padding-bottom: var(--pad); 
-    font-size: 1.3em;
-}
-
-#intro-holder>div{
-    width: 80%;
-}
-
-#intro-name>b{
-    color: var(--subMain1);
-}
-
-#intro-des>b{
-    color: var(--subMain2);
-}
-
-#intro-name{
-    margin-bottom: 20px;
-}
-
-/* ============================projects======================== */
-
-#proj  {
-  display: flex;
-  flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
-  justify-content: center; /* Centers project sections horizontally */
-  align-items: center;
-  flex-flow: row ;
-  height: fit-content;
-  width: 100vw;
-}
-
-#proj-header {
-    width: 100vw;
-    text-align: center;
-}
-
-/* Individual project sections (Software, Robotics) */
-#proj-software, #proj-robotics {
-  display: flex;
-  justify-content: center; /* Centers project sections horizontally */
-  flex-direction: row;
-  width: 50%;
-  height: 100%;
-
-}
-
-/* Title for each project section */
-.proj-topic {
-  width: 20%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 1.4em;
-}
-
-.proj-example-shelf {
-    display: flex;
-    flex-flow: row;
-}
-
-/* Container for project examples */
-.proj-examples {
-  width: 80%;
-  display: flex;
-  flex-flow: column;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Individual project example */
-.proj-example {
-  background-color: black; /* Very light gray */
-  padding: 10px;
-  border-radius: var(--borderRad);
-  font-size: 1em;
-  border: 2px solid var(--fColor);
-  --varSize: 150px;
-  width: calc(var(--varSize));
-  height: calc(var(--varSize) - 50px);
-  margin: 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-}
-
-.proj-example:hover {
-    cursor: pointer;
-    transform: scale(1.2);
-    transition: transform 0.2s ease-in-out;
-}
-
-/* Card Styling */
-.card-container {
-  display: flex;
-  gap: 20px;
-}
-
-.card {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 20px;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.card:hover {
-  transform: scale(1.02);
-}
-
-/* Modal Styling */
-.modal {
-  display: none; /* Hidden by default */
-  position: fixed;
-  top: 0;
-  left: 0;
-  color: black;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7); /* Blur effect */
-  z-index: 1000;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-content {
-  background: var(--fColor);
-  padding: 30px;
-  border-radius: 10px;
-  max-width: 600px;
-  width: 80%;
-  position: relative;
-}
-
-.close-btn {
-  position: absolute;
-  top: 10px;
-  right: 20px;
-  font-size: 28px;
-  cursor: pointer;
-}
-
-/* Prevent scrolling when modal is open */
-body.modal-open {
-  overflow: hidden;
-}
-
-/* ======================================= */
-
-#school-holder {
-    display: grid;
-  grid-template-columns: auto auto; /* Auto-width columns */
-  justify-content:space-around; /* Pushes elements to opposite sides */
-}
-
-#edu-holder, #awards-holder{
-    background-color: var(--main);
-    border-radius: var(--borderRad);
-    height: fit-content;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--fColor);
-    --pad: 20px;
-    padding-top: var(--pad);
-    padding-bottom: var(--pad); 
-    padding: 10px;
-    width: 500px
-
-}
-
-/* =========================================== */
-
-#social-holder {
-    display: flex;
-    flex-flow: row;
-    width: 100vw;
-}
-
-#social-header {
-    width: 20%;
-    text-align: end;
-}
-
-#social-socials {
-    width: 80%;
-    display: flex;
-    flex-flow: row;
-    align-items: center;
-    justify-content: center; /* Centers children horizontally */
-    gap: 10%; /* Optional: Adds space between flex items */
-}
-
-.social-social {
-    width: 70px;
-    background-color: black;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.social-social:hover {
-    cursor: pointer;
-    transform: scale(1.2);
-    transition: transform 0.2s ease-in-out;
-}
-
-/* Media query for responsiveness */
-@media screen and (max-width: 1110px) {
-    #school-holder {
-        display: grid;
-        grid-template-columns: 1fr; /* Single column (vertical stack) */
-        grid-auto-rows: auto; /* Each child gets its own row */
-        gap: 20px; /* Spacing between stacked items */
-        
-    }
-
-    #edu-holder, #awards-holder{
-        margin: auto;
-    }
-}
-
-@media screen and (max-width: 860px) {
-    #proj  {
-        display: flex;
-        flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
-        justify-content: center; /* Centers project sections horizontally */
-        align-items: center;
-        flex-flow: column ;
-        height: fit-content;
-        width: 100vw;
-        margin-bottom: 100px;
-    }
-    .proj-example {
-        background-color: black; /* Very light gray */
-        padding: 10px;
-        border-radius: var(--borderRad);
-        font-size: 1em;
-        border: 2px solid var(--fColor);
-        --varSize: 150px;
-        width: calc(var(--varSize));
-        height: calc(var(--varSize) - 50px);
-        margin: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-    }
-
-    #edu-holder, #awards-holder{
-        margin: auto;
-        width: 300px;
-        margin-bottom: 100px;
-    }
-}
-
-body.is-mobile {
-  font-size: 1.1em;
-}
-
-.hidden{
-    opacity: 0;
-    filter: blur(5px);
-    transform: translateX(-100%);
-    transition: all 1s;
-}
-
-.show{
-    filter: blur(0);
-    opacity: 1;
-    transform: translateX(0);
-}
-
-.space {
-    margin-top: var(--space);
-    margin-bottom: var(--space);
-}
-
-#escButton-holder {
-    display: flex;
-    align-items: center;
-    position: fixed;
-    width: 150px;
-    bottom: 25px;
-    left: calc(50vw - 75px);
-    z-index: 1001;
-    backdrop-filter: blur(1px);
-    border-radius: 100px;
-    padding: 20px;
-    background-color: rgba(0, 0, 0, 0.3); /* Optional dark tint */
-    visibility: hidden; 
-}
-#escButton-text {
-    font-size: 20px;
-    color: white;
-    width: 50%;
-}
-
-#escButton {
-    display: flex;
-    align-items: start;
-    justify-content: end;
-    width: 50%;
-}
-
-#escButton-image {
-    transform: scale(3);
-    width: 32px; /* sprite native width */
-    height: 16px; /* sprite native height */
-    background-image: url('/assets/esc-key.png');
-    background-repeat: no-repeat;
-    background-size: contain;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-}
-
-
-</style>
+<link rel="stylesheet" href="personalWebsite/index.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div id="background"></div>
@@ -466,7 +14,7 @@ body.is-mobile {
                 Software Engineer
             </div>
             <div id="title-info-years">
-                4ey
+                3 Years Experience
             </div>
         </div>
     </header>
@@ -476,9 +24,9 @@ body.is-mobile {
             Hello There ✋, I am <b>Bruno Rodriguez-Mendez</b>
         </div>
         <div id="intro-des">
-            I am a <b>Software Engineer</b> from <b>Florida</b>.
-            I have been programming for <b>1 year</b> (so I am just a baby 👶).
-            However, I have dabbled in many topics during that one year....
+            I am a <b>Software Engineer</b> from <b>Florida</b>, currently studying at <b>Brown University</b>.
+            With <b>3 years</b> of programming experience, I’ve built web apps, led community-focused tech projects,
+            and contributed to open-source software. From SAT tools to robotics with recycled parts—my code has purpose.
         </div>
     </div>
     <div id="proj-holder">
@@ -496,19 +44,17 @@ body.is-mobile {
                     <div class="proj-example" onclick="openModal()">Sandbox Game</div>
                     <div class="proj-example" onclick="openModal()">Raycaster</div>
                 </div>
-
-                
             </div>
         </div>
         <div id="proj-robotics">
             <div class="proj-examples">
                 <div class="proj-example-shelf">
-                    <div class="proj-example" onclick="openModal()">Battery Bank</div>
+                    <div class="proj-example" onclick="openModal()">Battery Bank (e-waste)</div>
                     <div class="proj-example" onclick="openModal()">Circuit</div>
                 </div>
                 <div class="proj-topic">Robotics</div>
                 <div class="proj-example-shelf">
-                    <div class="proj-example" onclick="openModal()">Business Inventory Management</div>
+                    <div class="proj-example" onclick="openModal()">Inventory System</div>
                     <div class="proj-example" onclick="openModal()">Lego Cars</div>
                 </div>
             </div>
@@ -517,60 +63,18 @@ body.is-mobile {
 
     </div>
     <div id="school-holder">
-        <div class="space" id="edu-holder">
-            <h1 id="awards-header">Education</h1>
+        <div class="space" id="awards-holder">
+            <h1 id="awards-header">Awards</h1>
             <div id="awards-desc">
-                #intro-holder{
-                    background-color: var(--main);
-                    border-radius: var(--borderRad);
-                    height: fit-content;
-                    display: flex;
-                    flex-flow: column nowrap;
-                    align-items: center;
-                    justify-content: center;
-                    border: 2px solid var(--fColor);
-                    width: 50vw;
-                    margin-left: 25vw;
-                    margin-bottom: 40vh;
-                    --pad: 20px;
-                    padding-top: var(--pad);
-                    padding-bottom: var(--pad); 
-                    font-size: 1.3em;
-                    margin-top: 40vh;
-                }
-                
-                #intro-holder>div{
-                    width: 80%;
-                    line-height: 2em;
-                }
+                Gates Scholarship Recipient | Sunshine State Scholar | 2nd Place @ GDG Hackathon | Questbridge Finalist & Scholar | Google Cybersecurity & Security+ Certified | Cambridge AICE Diploma w/ Merit | 11th Place Youth Expression Film Contest | Azure Fundamentals Certified | Posse Nominee | Florida Bright Futures Academic Scholar | Valencia College President’s List | National Hispanic Recognition | Jason Bearid Memorial | Florida Realtors Scholarship | Youth Climate Project Scholarship
             </div>
         </div>
-        <div class="space" id="awards-holder">
-            <h1 id="edu-header">Awards</h1>
+        <div class="space" id="edu-holder">
+            <h1 id="edu-header">Education</h1>
             <div id="edu-desc">
-                #intro-holder{
-                    background-color: var(--main);
-                    border-radius: var(--borderRad);
-                    height: fit-content;
-                    display: flex;
-                    flex-flow: column nowrap;
-                    align-items: center;
-                    justify-content: center;
-                    border: 2px solid var(--fColor);
-                    width: 50vw;
-                    margin-left: 25vw;
-                    margin-bottom: 40vh;
-                    --pad: 20px;
-                    padding-top: var(--pad);
-                    padding-bottom: var(--pad); 
-                    font-size: 1.3em;
-                    margin-top: 40vh;
-                }
-                
-                #intro-holder>div{
-                    width: 80%;
-                    line-height: 2em;
-                }
+            Brown University (2025–2029) | Computer Engineering & Electrical Engineering<br>
+            Valencia College Dual Enrollment | UF Dual Enrollment | Florida Virtual School (2021–2025)<br>
+            Ocoee High School | GPA: 5.231 (Weighted), 3.96 (Unweighted) | Class Rank: 2/627
             </div>
         </div>
     </div>
@@ -580,104 +84,40 @@ body.is-mobile {
       <span class="close-btn" onclick="closeModal()">&times;</span>
       <h2 id="modal-title"></h2>
       <p id="modal-description"></p>
+        <iframe 
+        id="modal-video"
+        width="560" 
+        height="315" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+        allowfullscreen>
+        </iframe>
     </div>
     </div>
-    <div id="escButton-holder"><div id="escButton-text">Hold</div> <div id="escButton"><div id="escButton-image"></div></div></div>
+    <div id="escButton-holder"><div id="escButton"><div id="escButton-image"></div></div></div>
     <footer>
-        <script>
-        const observer = new IntersectionObserver((entries) => {
-            //gives visible elements 'show' else remove
-            entries.forEach((entry) => {
-                if(entry.isIntersecting){
-                    entry.target.classList.add("show")
-                } else {
-                    entry.target.classList.remove("show")
-                }
-            })
-        })
-        
-        const hiddenElements = document.querySelectorAll(".hidden")
-        hiddenElements.forEach((el) => observer.observe(el))
-
-        // Inside iframe's JS
-        window.addEventListener('keydown', (e) => {
-            if (e.code === "Escape") {
-                window.parent.postMessage('ESCAPE_PRESSED', '*');
-            }
-        });
-
-        window.addEventListener('message', (event) => {
-            if (event.data === 'INFORM USER') {
-                document.getElementById('escButton-holder').style.visibility = 'visible';
-            }
-        });
-
-
-        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isMobile) {
-            console.log('youafks')
-            document.body.classList.add('is-mobile');
-        }
-
-        const projectDict = {
-        "Cleaning": "This is a cleaning website that I made for a customer. I designed the site in Figma, used the Next.js framework, incorporated MUI tools from Google, deployed it using Vercel, and purchased a Cloudflare domain for the client. I also assisted them with domain forwarding.",
-        "SAT": "This is an SAT (standardized test) study website that I created for students to get study help. I sourced all the questions and responses from the SAT question bank, extracted them to my local server, and then transferred them to my Firebase database. I designed the website progressively, adding Firebase OAuth, MUI tools, the Gemini AI API, and deployed it using Vercel.",
-        "Sandbox": "This is a C++ game where I utilized SFML, custom data structures, and memory management to create multiple entities on-screen that acted as elements such as rock, water, and sand. The elements could interact with each other and had their own physics.",
-        "Raycaster": "This is a C++ game where I utilized SFML to create a 3D rendering of a 2D map.",
-        "Battery": "This is a beta portable battery bank that I created using a lithium battery from a vape. I incorporated a charger and a voltage variable module to charge the battery bank and discharge the appropriate voltage to phones and other appliances.",
-        "Circuit": "This is a gift that I made for a friend, where I designed the circuit in KiCad and the casing in FreeCAD. I sourced the motor component from e-waste and also included cryptocurrency as a surprise element inside the gift.",
-        "Business": "This is a project I haven't finished yet, as it's still in the beta phase. However, in its current miniature form, it utilizes cardboard, a scissor lift, a client-to-server connection, and AI text analysis to manage inventory. It can also be controlled via a TV remote.",
-        "Lego": "This project utilizes both Lego and Arduino, along with a custom-designed battery holder in series to power the Lego components and attached DC motors. The car is controlled using a TV remote."
-        };
-
-        // Getting the first word that comes from the project name so that I can then load up the modal and the respected video/dsc
-        function openModal() {
-            let innerText = event['target']['innerText']
-            let firstProjWord = innerText.split(' ')[0]
-            let description = projectDict[firstProjWord]
-            const modal = document.getElementById('modal');
-            const modalTitle = document.getElementById('modal-title');
-            const modalDescription = document.getElementById('modal-description');
-
-            modalTitle.textContent = innerText;
-            modalDescription.textContent = description;
-            modal.style.display = 'flex'; // Show modal
-            document.body.classList.add('modal-open'); // Disable scrolling
-        }
-
-        function closeModal() {
-            const modal = document.getElementById('modal');
-            modal.style.display = 'none'; // Hide modal
-            document.body.classList.remove('modal-open'); // Re-enable scrolling
-        }
-
-        // Close modal if clicked outside content
-        window.onclick = function(event) {
-            const modal = document.getElementById('modal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        };
-        </script>
+        <script src="personalWebsite/index.js"></script>
         <div id="social-holder">
             <div id="social-header"><b>©</b> Bruno Rodriguez-Mendez</div>
             <div id="social-socials">
-                <div class="social-social">
-                    GitHub
+                <a href="https://github.com/brubru6707" target="_blank" class="social-link">
+                    <div class="social-social">
+                    <i class="fab fa-github"></i>
+                    </div>
+                </a>
+                
+                <a href="https://www.linkedin.com/in/bruno-rodriguez-mendez-18723725b/" target="_blank" class="social-link">
+                    <div class="social-social">
+                    <i class="fab fa-linkedin"></i>
+                    </div>
+                </a>
+                
+                <a href="https://www.instagram.com/brubru6707/" target="_blank" class="social-link">
+                    <div class="social-social">
+                    <i class="fab fa-instagram"></i>
+                    </div>
+                </a>
                 </div>
-                <div class="social-social">
-                    Insta
-                </div>
-                <div class="social-social">
-                    Twitch
-                </div>
-                <div class="social-social">
-                    LinkedIn
-                </div>
-                <div class="social-social">
-                    FaceBook
-                </div>
-            </div>
         </div>
     </footer>
 </body>

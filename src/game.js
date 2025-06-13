@@ -1,7 +1,7 @@
-let downF
-let downL
-let downP
 let downESC
+let downF
+const keyPopout = new Set(); // used to show specific keys when the player is interacting 
+let playerNearTree = false;
 
 class IntroScene extends Phaser.Scene {
     constructor() {
@@ -17,6 +17,7 @@ class IntroScene extends Phaser.Scene {
 
     create() {
         let scale = 0
+
         if (window.innerWidth > window.innerHeight) {
             scale = window.innerHeight / (90 * 1.2)
         } else {
@@ -50,10 +51,14 @@ class MainScene extends Phaser.Scene {
         this.lastDirection = 'none'; // Track player's last direction
         this.miniMap = null
         this.acceleration = 15;
-        this.maxSpeed = 1000;
+        this.maxSpeed = 200;
         this.friction = 0.9;
         this.orbActivated = false;
         this.zombieMoved = false
+        this.touchTarget = {x: 0, y: 0}
+        this.activateAxe = false
+        this.movementTimer = null;
+        this.mobilePlayerMove = false;
     }
 
     preload() {
@@ -84,7 +89,7 @@ class MainScene extends Phaser.Scene {
         this.fKeySprite = this.add.image(0, 0, 'fKey').setScrollFactor(0).setVisible(false).setDepth(1000).setScale(keySize) // on top of everything 
         this.computer = this.physics.add.staticSprite(worldWidth / 2, worldHeight / 2, 'computer', 0).setScale(15).refreshBody();
         this.orb = this.physics.add.staticSprite(worldWidth / 1.2, worldHeight / 3.5, 'orb', 0).setScale(4).refreshBody();
-        this.player = this.physics.add.sprite(worldWidth / 2 - 250, worldHeight / 2, 'me', 0).setScale(3).refreshBody();
+        this.player = this.physics.add.sprite(worldWidth / 2 - 290, worldHeight / 2, 'me', 0).setScale(3).refreshBody();
         this.player.setCollideWorldBounds(true);
         this.axe = this.physics.add.sprite(0, 0, 'axe', 0).setVisible(false).setScale(4).refreshBody();
         this.zombie = this.physics.add.sprite(100, 100, 'zombie').setScale(3).refreshBody();
@@ -92,6 +97,10 @@ class MainScene extends Phaser.Scene {
         let signX = Math.random() < 0.5 ? -1 : 1
         let signY = Math.random() < 0.5 ? -1 : 1
         this.bombTile = this.physics.add.sprite(worldWidth / 2 + (150*(5*Math.random())*signX), worldHeight / 2 + (150*(5*Math.random())*signY), 'hidden-bomb').setImmovable(true).setScale(3).refreshBody();
+
+        // Update pointer mobile location
+        this.touchTarget = {x: this.player.x, y:  this.player.y}
+        this.input.on('pointerdown', this.handleTouchInput, this);
 
         // create animations
         this.createAnimations.call(this, 'me');
@@ -164,7 +173,6 @@ class MainScene extends Phaser.Scene {
     
             const tree = this.trees.create(x, y, 'tree').setScale(3).refreshBody();
             tree.chopProgress = 0; 
-            
         }
 
         // Make sure trees don't spawn on the computer
@@ -192,8 +200,6 @@ class MainScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.cameras.main.startFollow(this.player);
         downF = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
-        downL = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
-        downP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
         downESC = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
         // Overlap detection instead of collider for axe
@@ -245,9 +251,43 @@ class MainScene extends Phaser.Scene {
     }
 
     update() {
+        let pointingAtKey = true
+        this.input.on('pointerdown', (pointer) => {
+            if (this.mobilePlayerMove == false) {
+                this.mobilePlayerMove = true
+                this.movementTimer = setTimeout(() => {
+                    this.mobilePlayerMove = false
+                    this.player.setVelocity(0, 0);
+                    this.player.play('idle-me', true);
+                    this.lastDirection = 'none';  
+                }, 4000);
+            }   
+        }, this);
+        keyPopout.clear();
+
+        const computerDistanceX = Math.abs(this.player.x-this.computer.getCenter().x)
+        const computerDistanceY = Math.abs(this.player.y-this.computer.getCenter().y)
+        const orbDistanceX = Math.abs(this.player.x-this.orb.getCenter().x)
+        const orbDistanceY = Math.abs(this.player.y-this.orb.getCenter().y)
+        // Calculate distance between tree and the users
+        playerNearTree = false
+        this.trees.getChildren().forEach(tree => {
+            if (Phaser.Math.Distance.Between(tree.x, tree.y, this.player.x, this.player.y) < 150) { 
+                playerNearTree = true;
+            }
+        });
+
+        let holdFRules = (computerDistanceX < 250 && computerDistanceY < 240) || (orbDistanceX < 150 && orbDistanceY < 150 ) || playerNearTree
+
+        if (holdFRules) { 
+            if (this.orbActivated) {
+                keyPopout.add("holdESC")
+            } else
+                keyPopout.add("holdF")
+        } 
+
         const player = this.player;
         const cursors = this.cursors;
-        // Get current velocity
         let velX = this.player.body.velocity.x;
         let velY = this.player.body.velocity.y;
 
@@ -265,51 +305,112 @@ class MainScene extends Phaser.Scene {
             });
         }
 
-        // Input
-        if (this.cursors.left.isDown) {
-            velX -= this.acceleration;
-        } else if (this.cursors.right.isDown) {
-            velX += this.acceleration;
+        // Check if the player is pointing at a key
+        if (this.isLikelyMobileDevice()) {
+            const centerX = this.cameras.main.width / 2;
+            const bottomY = this.cameras.main.height - 40;
+            this.input.on('pointerdown', this.handleTouchInput, this);
+            const { x: keyX, y: keyY } = this.cameras.main.getWorldPoint(centerX, bottomY);
+            const dx = Math.round(this.touchTarget.x - keyX);
+            const dy = Math.round(this.touchTarget.y - keyY);
+            const distance = Math.hypot(dx, dy); 
+
+            if (distance < 55 && keyPopout.size != 0) {
+                pointingAtKey = true
+                this.activateAxe = true;
+                setTimeout(() => {
+                    this.activateAxe = false;
+                }, 2000); 
+            } else {
+                pointingAtKey = false 
+                this.activateAxe = false
+            }          
         }
 
-        if (this.cursors.up.isDown) {
-            velY -= this.acceleration;
-        } else if (this.cursors.down.isDown) {
-            velY += this.acceleration;
+        // Player Movement
+        if (this.isLikelyMobileDevice() && !pointingAtKey && this.mobilePlayerMove)  {
+            const dx = Math.round(this.touchTarget.x - this.player.x);
+            const dy = Math.round(this.touchTarget.y - this.player.y);
+            const distance = Math.hypot(dx, dy);
+            const speed = this.maxSpeed;
+
+            if (distance <= 20) {
+                // Cancel movement early if we reach the destination
+                this.player.setVelocity(0, 0);
+                this.player.play('idle-me', true);
+                this.lastDirection = 'none';
+            } else {
+                const angle = Math.atan2(dy, dx);
+                this.player.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+                // Play correct animation
+                const absDx = Math.abs(dx);
+                const absDy = Math.abs(dy);
+                if (absDx > absDy) {
+                    if (dx > 0) {
+                        this.player.play('right-me', true);
+                        this.lastDirection = 'right';
+                    } else {
+                        this.player.play('left-me', true);
+                        this.lastDirection = 'left';
+                    }
+                } else {
+                    if (dy > 0) {
+                        this.player.play('down-me', true);
+                        this.lastDirection = 'down';
+                    } else {
+                        this.player.play('up-me', true);
+                        this.lastDirection = 'up';
+                    }
+                }
+            }
+        } else {
+                
+            // Keyboard Input
+            if (this.cursors.left.isDown) {
+                velX -= this.acceleration;
+            } else if (this.cursors.right.isDown) {
+                velX += this.acceleration;
+            }
+            if (this.cursors.up.isDown) {
+                velY -= this.acceleration;
+            } else if (this.cursors.down.isDown) {
+                velY += this.acceleration;
+            }
+
+            // Apply friction if no key is pressed
+            if (!this.cursors.left.isDown && !this.cursors.right.isDown) {
+                velX *= this.friction;
+            }
+            if (!this.cursors.up.isDown && !this.cursors.down.isDown) {
+                velY *= this.friction;
+            }
+
+            // Cap velocity
+            velX = Phaser.Math.Clamp(velX, -this.maxSpeed, this.maxSpeed);
+            velY = Phaser.Math.Clamp(velY, -this.maxSpeed, this.maxSpeed);
+
+            // Apply new velocity
+            this.player.setVelocity(velX, velY);
+
+            if (cursors.left.isDown) {
+                player.play('left-me', true);
+                this.lastDirection = 'left';
+            } else if (cursors.right.isDown) {
+                player.play('right-me', true);
+                this.lastDirection = 'right';
+            } else if (cursors.up.isDown) {
+                player.play('up-me', true);
+                this.lastDirection = 'up';
+            } else if (cursors.down.isDown) {
+                player.play('down-me', true);
+                this.lastDirection = 'down';
+            } else
+                player.play('idle-me', true);
         }
-
-        // Apply friction if no key is pressed
-        if (!this.cursors.left.isDown && !this.cursors.right.isDown) {
-            velX *= this.friction;
-        }
-        if (!this.cursors.up.isDown && !this.cursors.down.isDown) {
-            velY *= this.friction;
-        }
-
-        // Cap velocity
-        velX = Phaser.Math.Clamp(velX, -this.maxSpeed, this.maxSpeed);
-        velY = Phaser.Math.Clamp(velY, -this.maxSpeed, this.maxSpeed);
-
-        // Apply new velocity
-        this.player.setVelocity(velX, velY);
-
-        if (cursors.left.isDown) {
-            player.play('left-me', true);
-            this.lastDirection = 'left';
-        } else if (cursors.right.isDown) {
-            player.play('right-me', true);
-            this.lastDirection = 'right';
-        } else if (cursors.up.isDown) {
-            player.play('up-me', true);
-            this.lastDirection = 'up';
-        } else if (cursors.down.isDown) {
-            player.play('down-me', true);
-            this.lastDirection = 'down';
-        } else
-            player.play('idle-me', true);
 
         // Axe positioning
-        if (downF.isDown) {
+        if ((downF.isDown || this.activateAxe) && this.mobilePlayerMove) {
             this.axeRotations += this.axeRotations < 0.5 ? this.axeRotations * 1.01 + 0.01 : 0.5;
             let variableOffsetChange = 10          
             if (this.lastDirection == "left") {
@@ -354,23 +455,6 @@ class MainScene extends Phaser.Scene {
             this.computerIframe.style.top = `${iframeTop - scaledOffsetY}px`;
         }
 
-        const computerDistanceX = Math.abs(this.player.x-this.computer.getCenter().x)
-        const computerDistanceY = Math.abs(this.player.y-this.computer.getCenter().y)
-        const orbDistanceX = Math.abs(this.player.x-this.orb.getCenter().x)
-        const orbDistanceY = Math.abs(this.player.y-this.orb.getCenter().y)
-
-        let holdFRules = (computerDistanceX < 250 && computerDistanceY < 240) || (orbDistanceX < 150 && orbDistanceY < 150 )
-
-        if (holdFRules) {  // ← adjust this range as needed
-            if (this.orbActivated) {
-                this.setLog("","")
-                this.setLog("", "holdESC")
-            } else
-                this.setLog("", "holdF")
-        } else {
-            this.setLog("", "")
-        }
-
         // Periodically update direction
         if (this.zombieMoved == false) {
             this.zombieMoved = true
@@ -405,6 +489,8 @@ class MainScene extends Phaser.Scene {
                 break;
         }
 
+        this.setLog(keyPopout) 
+
     }
 
     cutTree(axe, tree) {
@@ -431,30 +517,34 @@ class MainScene extends Phaser.Scene {
     
     }
 
-    setLog(message, priority) {
-        this.logText.setVisible(false)
-        switch (priority) {
-            case ("holdESC"):
-                this.escKeySprite.setVisible(true);
-                this.escKeySprite.setPosition(this.cameras.main.width / 2 + 80, this.cameras.main.height - 40);
-                this.logText.setVisible(true)
-                this.logText.setText("Hold ").setScale(2);
-                this.escKeySprite.setScrollFactor(0);
-                break
-            case ("holdF"):
-                this.fKeySprite.setVisible(true);
-                this.fKeySprite.setPosition(this.cameras.main.width / 2 + 80, this.cameras.main.height - 40);
-                this.logText.setVisible(true)
-                this.logText.setText("Hold ").setScale(2);
-                this.fKeySprite.setScrollFactor(0);
-                break
-            default: 
-                console.log("invi")
-                this.logText.setVisible(false)
-                this.escKeySprite.setVisible(false);
-                this.fKeySprite.setVisible(false);
+    setLog(messagesSet) {
+        const centerX = this.cameras.main.width / 2;
+        const bottomY = this.cameras.main.height - 40;
+
+        // Hide everything first and add init configs
+        this.fKeySprite.setVisible(false);
+        this.escKeySprite.setVisible(false);
+        this.fKeySprite.setScrollFactor(0);
+        this.escKeySprite.setScrollFactor(0);
+        this.fKeySprite.setPosition(3000, 3000);
+        this.escKeySprite.setPosition(3000, 3000);
+        this.fKeySprite.setVisible(true);
+        this.escKeySprite.setVisible(true);
+
+        // Convert set to array
+        const keys = Array.from(messagesSet);
+
+        if (keys.length === 0) {
+            return; // nothing to show
+        } else if (keys.length == 1) {
+            if(keys[0] == "holdF")
+                this.fKeySprite.setPosition(centerX, bottomY);
+            else 
+                this.escKeySprite.setPosition(centerX, bottomY);
+        } else if (keys.length == 2) {
+            this.fKeySprite.setPosition(centerX + 20, bottomY);
+            this.escKeySprite.setPosition(centerX - 20, bottomY);
         }
-            
 
     }
     
@@ -481,10 +571,11 @@ class MainScene extends Phaser.Scene {
     }
     
     enterWebsiteMode() {
-        this.setLog("holdESC", "holdESC")
+        keyPopout.add("HoldF")
+        keyPopout.add("HoldESC")
         this.scene.pause();
         this.game.canvas.style.display = 'none';
-        document.body.style.overflow = 'scroll';
+        document.body.style.overflow = 'hidden';
     
         // Create iframe
         const iframe = document.createElement('iframe');
@@ -500,12 +591,11 @@ class MainScene extends Phaser.Scene {
     
         document.body.appendChild(iframe);
 
-        window.addEventListener('keydown', (e) => {
+        setTimeout(() => {
             iframe.contentWindow.postMessage('INFORM USER', '*');
-        });
+        }, 500);
 
         const escHandler = (event) => {
-            console.log("this i")
             if (event.code === "Escape") {
                 iframe.remove();
                 this.game.canvas.style.display = 'block';
@@ -573,7 +663,6 @@ class MainScene extends Phaser.Scene {
         if (!this.canChop) return;
         this.canChop = false;
     
-        // Shake the computer randomly
         this.tweens.add({
             targets: orb,
             x: { value: orb.x + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
@@ -582,11 +671,10 @@ class MainScene extends Phaser.Scene {
                 this.orbChops++;    
                 if (this.orbChops >= 3) {
                     this.orbActivated = true
-                    this.setLog("","")
-                    this.setLog("", "holdESC")
-                    let title = "hello there"
-                    let description = "what even is this"
-                    let videoUrl = "lalalalalalal"
+                    keyPopout.add("HoldESC")
+                    let title = "I'm Salutrian ^_^"
+                    let description = "My silly speech"
+                    let videoUrl = "https://www.youtube.com/embed/8MPoMOXszWM"
                     this.enterModal(title, description, videoUrl)
                 }
             }
@@ -598,6 +686,7 @@ class MainScene extends Phaser.Scene {
     }
 
     enterModal(title, description, videoUrl) {
+        // Set modal content
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-description').textContent = description;
         document.getElementById('modal-video').src = videoUrl;
@@ -610,17 +699,46 @@ class MainScene extends Phaser.Scene {
 
         this.scene.pause(); // Pause game logic
 
-        window.addEventListener('keydown', (e) => {
-            if(e.code == "Escape")
-                this.hideProjectModal()
-        });
+        // Keyboard close handler
+        const keyHandler = (e) => {
+            if(e.code == "Escape") {
+                this.hideProjectModal();
+            }
+        };
+
+        // Mobile click-to-close handler
+        const clickHandler = (e) => {
+            // Check if click is outside modal content (on backdrop)
+            if (!e.target.closest('.modal-content')) {
+                this.hideProjectModal();
+            }
+        };
+
+        // Store handlers for later removal
+        this.currentModalHandlers = {
+            keyHandler,
+            clickHandler
+        };
+
+        // Add event listeners
+        window.addEventListener('keydown', keyHandler);
+        document.getElementById('project-modal').addEventListener('click', clickHandler);
     }
 
     hideProjectModal() {
-        this.orbActivated = false
+        // Clear video source and hide modal
         document.getElementById('modal-video').src = '';
         document.getElementById('project-modal').style.display = 'none';
         this.escKeySprite.setVisible(false);
+        
+        // Remove event listeners
+        if (this.currentModalHandlers) {
+            window.removeEventListener('keydown', this.currentModalHandlers.keyHandler);
+            document.getElementById('project-modal').removeEventListener('click', this.currentModalHandlers.clickHandler);
+            this.currentModalHandlers = null;
+        }
+
+        this.orbActivated = false;
         this.scene.resume(); // Resume game logic
     }
     
@@ -655,6 +773,18 @@ class MainScene extends Phaser.Scene {
           frameRate: 10,
           repeat: -1
         });
+    }
+
+    isLikelyMobileDevice() {
+        return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    }
+
+    handleTouchInput(pointer) {
+        // Save the destination coordinates
+        this.touchTarget = {
+            x: pointer.worldX,
+            y: pointer.worldY
+        };
     }
       
 }
