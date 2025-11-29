@@ -1,5 +1,4 @@
 export const subdomains = [
-  "darkhorse",
   "ai-arsenal",
   "anarchy-clipboard",
   "checkers-game",
@@ -7,6 +6,7 @@ export const subdomains = [
   "nts-study-buddy",
   "ohs-chess-club",
   "ohs-key-club",
+  "old-portfolio",
   "rag-for-hod-book",
 ];
 

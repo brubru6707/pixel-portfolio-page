@@ -1,4 +1,5 @@
-import { keyPopout, isLikelyMobileDevice, createAnimations } from '../utils/helpers.js';
+import { keyPopout, isLikelyMobileDevice, createAnimations, subdomains } from '../utils/helpers.js';
+import Bobat from '../entities/Bobat.js';
 
 let downESC;
 let downF;
@@ -21,6 +22,9 @@ export default class MainScene extends Phaser.Scene {
         this.activateAxe = false
         this.movementTimer = null;
         this.mobilePlayerMove = false;
+        this.bobats = [];
+        this.instructionsShown = false;
+        this.playerMoved = false;
     }
 
     preload() {
@@ -36,6 +40,9 @@ export default class MainScene extends Phaser.Scene {
         this.load.spritesheet('ghost', 'assets/ghost.png', { frameWidth: 18, frameHeight: 30 });
         this.load.spritesheet('hidden-bomb', 'assets/hidden-bomb.png', { frameWidth: 27, frameHeight: 15 });
         this.load.spritesheet('explosive', 'assets/explosive.png', { frameWidth: 34, frameHeight: 40 });
+        this.load.spritesheet('bobat', 'assets/bobot.png', { frameWidth: 100, frameHeight: 100 });
+        this.load.image('instructions', 'assets/instructions.png');
+        this.load.image('instructions', 'assets/instructions.png');
     }
 
     create() {
@@ -97,11 +104,41 @@ export default class MainScene extends Phaser.Scene {
             frameRate: 5,
             repeat: -1,
         });
+        this.anims.create({
+            key: 'down-bobat',
+            frames: this.anims.generateFrameNumbers('bobat', { start: 0, end: 1 }),
+            frameRate: 6,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'left-bobat',
+            frames: this.anims.generateFrameNumbers('bobat', { start: 2, end: 3 }),
+            frameRate: 6,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'right-bobat',
+            frames: this.anims.generateFrameNumbers('bobat', { start: 4, end: 5 }),
+            frameRate: 6,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'up-bobat',
+            frames: this.anims.generateFrameNumbers('bobat', { start: 6, end: 7 }),
+            frameRate: 6,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'idle-bobat',
+            frames: [{ key: 'bobat', frame: 0 }],
+            frameRate: 1,
+            repeat: -1
+        });
           
         // play animations 
         this.orb.anims.play('aura');
         this.computer.anims.play('blink');
-        this.zombie.anims.play('idle');
+        this.zombie.anims.play('idle-zombie');
         this.bombTile.anims.play("bomb-idle")
 
         // Call this periodically
@@ -117,7 +154,57 @@ export default class MainScene extends Phaser.Scene {
         this.orbChops = 0;
         this.zombie.direction = null;
 
-        // Spawn trees without overlap
+        // Initialize bobats array
+        this.bobats = [];
+
+        // Spawn bobats first (around the edges, not in center)
+        subdomains.forEach((subdomain, index) => {
+            let x, y;
+            let validPosition = false;
+            
+            // Find a valid spawn position away from the center
+            while (!validPosition) {
+                x = Phaser.Math.Between(100, worldWidth - 100);
+                y = Phaser.Math.Between(100, worldHeight - 100);
+                validPosition = true;
+                
+                // Don't spawn in the center area (where player/computer/orb are)
+                const centerX = worldWidth / 2;
+                const centerY = worldHeight / 2;
+                if (Phaser.Math.Distance.Between(x, y, centerX, centerY) < 500) {
+                    validPosition = false;
+                    continue;
+                }
+                
+                // Check distance from computer
+                if (Phaser.Math.Distance.Between(x, y, this.computer.x, this.computer.y) < 300) {
+                    validPosition = false;
+                    continue;
+                }
+                
+                // Check distance from orb
+                if (Phaser.Math.Distance.Between(x, y, this.orb.x, this.orb.y) < 300) {
+                    validPosition = false;
+                    continue;
+                }
+                
+                // Check distance from other bobats
+                for (let otherBobat of this.bobats) {
+                    if (Phaser.Math.Distance.Between(x, y, otherBobat.sprite.x, otherBobat.sprite.y) < 200) {
+                        validPosition = false;
+                        break;
+                    }
+                }
+            }
+            
+            const bobat = new Bobat(this, x, y, subdomain);
+            this.bobats.push(bobat);
+            
+            // Start with idle animation
+            bobat.sprite.anims.play('idle-bobat');
+        });
+
+        // Spawn trees without overlap (after bobats)
         this.trees = this.physics.add.staticGroup();
         for (let i = 0; i < 100; i++) {
             let x, y;
@@ -151,32 +238,54 @@ export default class MainScene extends Phaser.Scene {
             }
         });
 
+        // Make sure trees don't spawn near bobats
+        this.trees.getChildren().forEach(tree => {
+            for (let bobat of this.bobats) {
+                if (Phaser.Math.Distance.Between(tree.x, tree.y, bobat.sprite.x, bobat.sprite.y) < 200) {
+                    tree.destroy();
+                    break;
+                }
+            }
+        });
+
+        // Add collisions for bobats with trees
+        this.bobats.forEach(bobat => {
+            this.physics.add.collider(bobat.sprite, this.trees);
+            this.physics.add.collider(bobat.sprite, this.computer);
+            this.physics.add.collider(bobat.sprite, this.orb);
+        });
+
         // Add collision between player and some objects
         this.physics.add.collider(this.player, this.trees);
         this.physics.add.collider(this.player, this.computer);
         this.physics.add.collider(this.player, this.orb);
         this.physics.add.overlap(this.player, this.bombTile, this.triggerExplosion, null, this);
 
-
         // Keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
         this.cameras.main.startFollow(this.player);
+        
+        // Show instructions at the center of the screen
+        this.instructionsImage = this.add.image(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            'instructions'
+        ).setScrollFactor(0).setDepth(10000).setScale(3);
+        this.playerMoved = false;
+        
         downF = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
         downESC = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
         // Overlap detection instead of collider for axe
         this.physics.add.overlap(this.axe, this.trees, this.cutTree, null, this);
         this.physics.add.overlap(this.axe, this.computer, this.hitComputer, null, this);        
-        this.physics.add.overlap(this.axe, this.orb, this.hitOrb, null, this);        
-
-        // Mini map camera 
-        const miniMapWidth = 150
-        this.miniMap = this.cameras.add(
-            window.innerWidth - miniMapWidth - 20,
-            20,
-            150,
-            150
-        ).setZoom(0.1).startFollow(this.player, true, 0.1, 0.1).setBackgroundColor(0x002244).setBounds(0, 0, worldWidth, worldHeight);
+        this.physics.add.overlap(this.axe, this.orb, this.hitOrb, null, this);
+        
+        // Add axe overlap for bobats
+        this.bobats.forEach(bobat => {
+            this.physics.add.overlap(this.axe, bobat.sprite, this.hitBobat, null, this);
+            bobat.chops = 0; // Track chops for each bobat
+        });
 
          this.logText = this.add.text(
             this.cameras.main.width / 2, 
@@ -206,10 +315,22 @@ export default class MainScene extends Phaser.Scene {
             this.computerIframe.style.height = '900px';
             this.computerIframe.style.transform = 'scale(0.15)';
             this.computerIframe.style.border = 'none';
-            this.computerIframe.style.zIndex = '999';
+            this.computerIframe.style.zIndex = '600';
             this.computerIframe.style.pointerEvents = 'none';
             document.body.appendChild(this.computerIframe);
         }, [], this);
+
+                // Mini map camera 
+        const miniMapWidth = 150
+        this.miniMap = this.cameras.add(
+            window.innerWidth - miniMapWidth - 20,
+            20,
+            150,
+            150
+        ).setZoom(0.1).startFollow(this.player, true, 0.1, 0.1).setBackgroundColor(0x002244).setBounds(0, 0, worldWidth, worldHeight);
+
+        // Make minimap ignore UI elements
+        this.miniMap.ignore([this.escKeySprite, this.fKeySprite, this.logText]);
     }
 
     update() {
@@ -238,8 +359,16 @@ export default class MainScene extends Phaser.Scene {
                 playerNearTree = true;
             }
         });
+        
+        // Check if player is near any bobat
+        let playerNearBobat = false;
+        this.bobats.forEach(bobat => {
+            if (Phaser.Math.Distance.Between(bobat.sprite.x, bobat.sprite.y, this.player.x, this.player.y) < 150) {
+                playerNearBobat = true;
+            }
+        });
 
-        let holdFRules = (computerDistanceX < 250 && computerDistanceY < 240) || (orbDistanceX < 150 && orbDistanceY < 150 ) || playerNearTree
+        let holdFRules = (computerDistanceX < 250 && computerDistanceY < 240) || (orbDistanceX < 150 && orbDistanceY < 150 ) || playerNearTree || playerNearBobat
 
         if (holdFRules) { 
             if (this.orbActivated) {
@@ -252,6 +381,22 @@ export default class MainScene extends Phaser.Scene {
         const cursors = this.cursors;
         let velX = this.player.body.velocity.x;
         let velY = this.player.body.velocity.y;
+
+        // Hide instructions when player moves
+        if (!this.playerMoved && this.instructionsImage && this.instructionsImage.visible) {
+            const anyMovement = cursors.left.isDown || cursors.right.isDown || 
+                              cursors.up.isDown || cursors.down.isDown || 
+                              this.mobilePlayerMove;
+            if (anyMovement) {
+                this.playerMoved = true;
+                this.instructionsImage.setVisible(false);
+            }
+        }
+
+        // Prevent gameplay until player moves
+        if (!this.playerMoved) {
+            return;
+        }
 
         if (this.lastDirection == "none") { 
             this.trees.getChildren().forEach(tree => {
@@ -453,6 +598,11 @@ export default class MainScene extends Phaser.Scene {
                 break;
         }
 
+        // Update all bobats
+        this.bobats.forEach(bobat => {
+            bobat.update(this.game.loop.delta);
+        });
+
         this.setLog(keyPopout) 
 
     }
@@ -636,7 +786,7 @@ export default class MainScene extends Phaser.Scene {
                 if (this.orbChops >= 3) {
                     this.orbActivated = true
                     keyPopout.add("HoldESC")
-                    let title = "I'm Salutrian ^_^"
+                    let title = "I'm Salutarian ^_^"
                     let description = "My silly speech"
                     let videoUrl = "https://www.youtube.com/embed/8MPoMOXszWM"
                     this.enterModal(title, description, videoUrl)
@@ -712,6 +862,39 @@ export default class MainScene extends Phaser.Scene {
             x: pointer.worldX,
             y: pointer.worldY
         };
+    }
+
+    hitBobat(axe, bobatSprite) {
+        if (!this.canChop) return;
+        this.canChop = false;
+    
+        // Find the bobat object that owns this sprite
+        const bobat = this.bobats.find(b => b.sprite === bobatSprite);
+        if (!bobat) return;
+    
+        // Shake the bobat
+        this.tweens.add({
+            targets: bobatSprite,
+            x: { value: bobatSprite.x + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            y: { value: bobatSprite.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            onComplete: () => {
+                bobat.chops++;    
+                if (bobat.chops >= 3) {
+                    this.openBobatLink(bobat);
+                }
+            }
+        });
+    
+        this.time.delayedCall(500, () => { 
+            this.canChop = true; 
+        }, [], this);
+    }
+
+    openBobatLink(bobat) {
+        const url = `https://${bobat.subdomain}.bruno-rodriguez-mendez.com`;
+        window.open(url, '_blank');
+        // Reset chops
+        bobat.chops = 0;
     }
       
 }
