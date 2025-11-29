@@ -892,9 +892,67 @@ export default class MainScene extends Phaser.Scene {
 
     openBobatLink(bobat) {
         const url = `https://${bobat.subdomain}.bruno-rodriguez-mendez.com`;
-        window.open(url, '_blank');
-        // Reset chops
-        bobat.chops = 0;
+        
+        // Pause the game
+        this.scene.pause();
+        this.game.canvas.style.display = 'none';
+        document.body.style.overflow = 'hidden';
+        
+        // Create fullscreen iframe
+        const iframe = document.createElement('iframe');
+        iframe.id = 'bobatWebsite';
+        iframe.src = url;
+        iframe.style.position = 'absolute';
+        iframe.style.top = '0';
+        iframe.style.left = '0';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.style.zIndex = '1000';
+        
+        document.body.appendChild(iframe);
+        
+        // Create DOM ESC button at bottom right using esc-key.png
+        const escButton = document.createElement('img');
+        escButton.id = 'bobatEscButton';
+        escButton.src = 'assets/esc-key.png';
+        escButton.style.position = 'fixed';
+        escButton.style.bottom = '25px';
+        escButton.style.right = '25px';
+        escButton.style.zIndex = '1001';
+        escButton.style.cursor = 'pointer';
+        escButton.style.imageRendering = 'pixelated';
+        escButton.style.width = '64px';
+        
+        document.body.appendChild(escButton);
+        
+        // ESC key handler
+        const escHandler = (event) => {
+            if (event.code === "Escape") {
+                iframe.remove();
+                escButton.remove();
+                this.game.canvas.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                this.scene.resume();
+                document.removeEventListener('keydown', escHandler);
+                // Reset chops
+                bobat.chops = 0;
+            }
+        };
+        
+        // Click handler for ESC button
+        escButton.addEventListener('click', () => {
+            iframe.remove();
+            escButton.remove();
+            this.game.canvas.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            this.scene.resume();
+            document.removeEventListener('keydown', escHandler);
+            // Reset chops
+            bobat.chops = 0;
+        });
+        
+        document.addEventListener('keydown', escHandler);
     }
       
 }

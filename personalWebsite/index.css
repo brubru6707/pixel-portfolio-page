@@ -653,7 +653,7 @@ body.is-mobile {
 
 @media (max-width: 768px) {
     body {
-        font-size: 1.2em;
+        font-size: 1.6em;
     }
     
     header {
@@ -664,7 +664,7 @@ body.is-mobile {
     }
     
     #title-name {
-        font-size: 1.3em;
+        font-size: 1.8em;
         text-align: center;
         padding: 0;
     }
@@ -678,7 +678,7 @@ body.is-mobile {
     }
     
     .nav-link {
-        font-size: 0.6em;
+        font-size: 0.8em;
         padding: 5px 8px;
         white-space: nowrap;
     }
@@ -688,7 +688,7 @@ body.is-mobile {
     #experience-holder {
         width: 90vw !important;
         margin-left: 5vw !important;
-        font-size: 0.9em;
+        font-size: 1.1em;
     }
     
     #proj {
@@ -711,19 +711,19 @@ body.is-mobile {
     }
     
     #awards-desc li {
-        font-size: 0.85em;
-        line-height: 1.5em;
+        font-size: 1.05em;
+        line-height: 1.6em;
     }
     
     .edu-item {
-        font-size: 0.9em;
+        font-size: 1em;
         padding: 10px;
     }
 }
 
 @media (max-width: 480px) {
     body {
-        font-size: 1em;
+        font-size: 1.4em;
     }
     
     header {
@@ -731,7 +731,7 @@ body.is-mobile {
     }
     
     #title-name {
-        font-size: 1.1em;
+        font-size: 1.5em;
     }
     
     #nav-menu {
@@ -739,14 +739,14 @@ body.is-mobile {
     }
     
     .nav-link {
-        font-size: 0.55em;
+        font-size: 0.75em;
         padding: 4px 6px;
     }
     
     #intro-holder,
     #archived-projects,
     #experience-holder {
-        font-size: 0.85em;
+        font-size: 1.05em;
     }
     
     .proj-topic {
@@ -754,7 +754,7 @@ body.is-mobile {
     }
     
     .proj-example {
-        font-size: 0.8em;
+        font-size: 1em;
         padding: 8px;
     }
 }
