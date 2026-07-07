@@ -10,6 +10,40 @@
     --pix: "Jersey 10", sans-serif;
 }
 
+/* Recruiter (standalone) view: swap the pixel font for a clean sans-serif.
+   Higher specificity than :root so it overrides --pix for all var(--pix) text. */
+html.recruiter-view {
+    --pix: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+/* The layout is tuned around the pixel font at 1.5em; a normal sans-serif at
+   that size overflows the fixed header. Tighten it so the recruiter view reads
+   clean and professional. */
+html.recruiter-view body { font-size: 1.05em; line-height: 1.7em; }
+
+/* Exit button shown only on the standalone recruiter view */
+#recruiter-exit {
+    position: fixed;
+    bottom: 18px;
+    right: 18px;
+    z-index: 2000;
+    padding: 10px 20px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fColor);
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid var(--fColor);
+    border-radius: 8px;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: background 0.2s, color 0.2s;
+}
+#recruiter-exit:hover {
+    background: var(--subMain2);
+    color: var(--fColor);
+}
+
 header{
     z-index: 1000;
     --space: 20px;
@@ -68,7 +102,7 @@ body{
     overflow-x: hidden;
     line-height: 2em;
     font-family: var(--pix);
-    font-size: 1.5em;
+    font-size: 1.7em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -125,9 +159,10 @@ body::before{
 
 footer{
     width: 100vw;
+    box-sizing: border-box;
     background-color: black;
     padding: 10px;
-    
+
 }
 
 ::selection{
@@ -188,59 +223,151 @@ footer{
     margin-bottom: 20px;
 }
 
-/* ============================projects======================== */
+/* ============================featured======================== */
 
-#proj  {
-  display: flex;
-  flex-wrap: wrap; /* Allows items to wrap to the next line on smaller screens */
-  justify-content: center; /* Centers project sections horizontally */
-  align-items: center;
-  flex-flow: row ;
-  height: fit-content;
-  width: 100vw;
+#featured-holder {
+    width: 70vw;
+    margin-left: 15vw;
 }
 
-#proj-header {
-    width: 100vw;
+#featured-header {
     text-align: center;
 }
 
-/* Individual project sections (Software, Robotics) */
-#proj-software, #proj-robotics {
-  display: flex;
-  justify-content: center; /* Centers project sections horizontally */
-  flex-direction: row;
-  width: 50%;
-  height: 100%;
-
+#featured-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 25px;
+    margin-top: 30px;
 }
 
-/* Title for each project section */
-.proj-topic {
-  width: 20%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 1.4em;
-}
-
-.proj-example-shelf {
+.featured-card {
     display: flex;
-    flex-flow: row;
+    flex-direction: column;
+    text-decoration: none;
+    color: var(--fColor);
+    border: 2px solid var(--fColor);
+    border-radius: var(--borderRad);
+    background-color: rgba(0, 0, 0, 0.85);
+    overflow: hidden;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
-/* Container for project examples */
-.proj-examples {
-  width: 80%;
-  display: flex;
-  flex-flow: column;
-  justify-content: center;
-  align-items: center;
+.featured-card:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 8px 22px rgba(236, 236, 218, 0.25);
+}
+
+.featured-thumb {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background-color: #000;
+    border-bottom: 2px solid var(--fColor);
+}
+
+.featured-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.featured-title {
+    padding: 12px 10px;
+    text-align: center;
+    font-size: 1.1em;
+    color: var(--subMain1);
+}
+
+/* ============================projects (collapsible)======================== */
+
+#proj-holder {
+    width: 70vw;
+    margin-left: 15vw;
+}
+
+#proj-header {
+    text-align: center;
+}
+
+#proj-hint {
+    text-align: center;
+    font-size: 0.85em;
+    opacity: 0.7;
+    margin-top: -10px;
+    margin-bottom: 30px;
+}
+
+#proj {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 25px;
+    width: 100%;
+}
+
+.proj-category {
+    flex: 1 1 320px;
+    max-width: 480px;
+    border: 2px solid var(--fColor);
+    border-radius: var(--borderRad);
+    background-color: rgba(0, 0, 0, 0.8);
+    overflow: hidden;
+}
+
+.proj-cat-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    background: transparent;
+    border: none;
+    color: var(--fColor);
+    font-family: var(--pix);
+    font-size: 1.4em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.proj-cat-header:hover {
+    background: rgba(236, 236, 218, 0.08);
+}
+
+.proj-cat-arrow {
+    color: var(--subMain2);
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+.proj-category.expanded .proj-cat-arrow {
+    transform: rotate(90deg);
+}
+
+/* Collapsed by default; expands "outwards" when the category is opened */
+.proj-cat-items {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+    gap: 18px;
+    max-height: 0;
+    opacity: 0;
+    padding: 0 18px;
+    overflow: hidden;
+    transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.4s ease;
+}
+
+.proj-category.expanded .proj-cat-items {
+    max-height: 1200px;
+    opacity: 1;
+    padding: 8px 18px 22px;
 }
 
 /* Individual project example */
 .proj-example {
-  background-color: black; /* Very light gray */
+  background-color: black;
   padding: 10px;
   border-radius: var(--borderRad);
   font-size: 1em;
@@ -248,7 +375,6 @@ footer{
   --varSize: 150px;
   width: calc(var(--varSize));
   height: calc(var(--varSize) - 50px);
-  margin: 20px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -257,8 +383,66 @@ footer{
 
 .proj-example:hover {
     cursor: pointer;
-    transform: scale(1.2);
+    transform: scale(1.1);
     transition: transform 0.2s ease-in-out;
+}
+
+/* ---- Load More buttons (archived projects + awards) ---- */
+.load-more-btn {
+    font-family: var(--pix);
+    font-size: 1em;
+    color: var(--fColor);
+    background-color: var(--subMain2);
+    border: 2px solid var(--fColor);
+    border-radius: var(--borderRad);
+    padding: 10px 28px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.load-more-btn:hover {
+    background-color: var(--subMain1);
+    transform: scale(1.05);
+}
+
+/* ---- Splatoon-style rainbow goop dripping from the intro triangles ---- */
+#goop-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -90;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.goop-drip {
+    position: absolute;
+    top: -4vh;
+    height: 0;
+    border-bottom-left-radius: 60% 40px;
+    border-bottom-right-radius: 60% 40px;
+    transform-origin: top center;
+    image-rendering: pixelated;
+    animation: goopDrip 1.8s cubic-bezier(0.25, 0.8, 0.4, 1) forwards;
+    will-change: height, transform;
+}
+
+.goop-drip::after {
+    /* the fat blob at the leading edge of the drip */
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -14px;
+    width: 130%;
+    height: 28px;
+    transform: translateX(-50%);
+    background: inherit;
+    border-radius: 50%;
+}
+
+@keyframes goopDrip {
+    0%   { height: 0; opacity: 0.95; }
+    70%  { opacity: 0.95; }
+    100% { opacity: 0.85; }
 }
 
 /* Card Styling */
@@ -598,11 +782,40 @@ body.is-mobile {
 }
 
 .archived-project-item {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    gap: 22px;
     padding: 20px;
     border: 2px solid var(--fColor);
     border-radius: var(--borderRad);
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.8);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.archived-project-item.collapsed {
+    display: none;
+}
+
+.archived-thumb {
+    flex: 0 0 auto;
+    width: 200px;
+    aspect-ratio: 16 / 10;
+    border: 2px solid var(--fColor);
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #000;
+}
+
+.archived-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.archived-text {
+    flex: 1 1 auto;
 }
 
 .archived-project-item:hover {
@@ -762,4 +975,50 @@ body.is-mobile {
 .social-icon {
   width: 40px;
   height: 40px;
+}
+
+/* ---- Responsiveness for the featured / archived / projects sections ---- */
+@media (max-width: 900px) {
+    #featured-grid {
+        grid-template-columns: 1fr;
+    }
+    #featured-holder,
+    #proj-holder {
+        width: 90vw;
+        margin-left: 5vw;
+    }
+}
+
+@media (max-width: 768px) {
+    #archived-projects {
+        width: 90vw !important;
+        margin-left: 5vw !important;
+    }
+    .archived-project-item {
+        flex-flow: column nowrap;
+        align-items: stretch;
+        text-align: left;
+    }
+    .archived-thumb {
+        width: 100%;
+    }
+    #proj {
+        flex-flow: column nowrap;
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 0;
+    }
+    .proj-category {
+        max-width: 100%;
+        flex-basis: auto;
+    }
+    .proj-cat-header {
+        font-size: 1.2em;
+    }
+    .proj-example {
+        --varSize: 118px;
+    }
+    img {
+        max-width: 100%;
+    }
 }

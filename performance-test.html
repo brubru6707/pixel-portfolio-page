@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Performance Test</title>
+</head>
+<body>
+    <h1>Device Performance Analysis</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { detectDevicePerformance, runPerformanceBenchmark, getPerformanceRecommendations } from './src/utils/helpers.js';
+
+        function displayResults() {
+            const perf = detectDevicePerformance();
+            const recommendations = getPerformanceRecommendations(perf);
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <h2>Hardware Info:</h2>
+                <ul>
+                    <li><strong>CPU Cores:</strong> ${perf.hardwareConcurrency}</li>
+                    <li><strong>Memory:</strong> ${perf.deviceMemory}GB</li>
+                    <li><strong>Mobile Device:</strong> ${perf.isMobile ? 'Yes' : 'No'}</li>
+                    <li><strong>User Agent:</strong> ${perf.userAgent}</li>
+                </ul>
+
+                <h2>Performance Assessment:</h2>
+                <ul>
+                    <li><strong>Benchmark Score:</strong> ${perf.benchmarkScore}/100</li>
+                    <li><strong>Is Slow:</strong> ${perf.isSlow ? 'Yes' : 'No'}</li>
+                    <li><strong>Is Very Slow:</strong> ${perf.isVerySlow ? 'Yes' : 'No'}</li>
+                </ul>
+
+                <h2>Recommendations:</h2>
+                <ul>
+                    ${recommendations.length > 0
+                        ? recommendations.map(rec => `<li>${rec}</li>`).join('')
+                        : '<li>No specific recommendations - device should perform well</li>'
+                    }
+                </ul>
+
+                <h2>Game Optimizations Applied:</h2>
+                <ul>
+                    <li><strong>Animations Disabled:</strong> ${perf.isVerySlow ? 'Yes' : 'No'}</li>
+                    <li><strong>Minimap Disabled:</strong> ${perf.isVerySlow ? 'Yes' : 'No'}</li>
+                    <li><strong>Update Throttling:</strong> ${perf.isSlow ? '2x (every other frame)' : '1x (every frame)'}</li>
+                </ul>
+            `;
+        }
+
+        // Run test when page loads
+        displayResults();
+    </script>
+</body>
+</html>

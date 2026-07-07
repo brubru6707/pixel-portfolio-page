@@ -22,7 +22,7 @@ export default class IntroScene extends Phaser.Scene {
         this.anims.create({
             key: 'playIntro',
             frames: this.anims.generateFrameNumbers('introAnim', { start: 0, end: 13 }),
-            frameRate: 10, // adjust as needed
+            frameRate: 16, // a little faster than before (was 10)
             repeat: 0
         });
 
@@ -32,7 +32,30 @@ export default class IntroScene extends Phaser.Scene {
             .play('playIntro');
 
         anim.on('animationcomplete', () => {
-            this.scene.start('MainScene');
+            this._afterIntro();
         });
+    }
+
+    // The intro always plays first. Only once it finishes do we route: a
+    // returning visitor goes straight to their saved choice; a first-timer
+    // gets the "Who are you?" gate (which then starts the game or redirects).
+    _afterIntro() {
+        let saved = null;
+        try { saved = localStorage.getItem('visitorType'); } catch (e) {}
+
+        if (saved === 'recruiter') {
+            window.location.replace('personalWebsite/index.html');
+            return;
+        }
+        if (saved === 'everyone') {
+            this.scene.start('MainScene');
+            return;
+        }
+        // First visit: reveal the gate. It starts the game on "Everyone Else".
+        if (typeof window.showVisitorGate === 'function') {
+            window.showVisitorGate(() => this.scene.start('MainScene'));
+        } else {
+            this.scene.start('MainScene');
+        }
     }
 }

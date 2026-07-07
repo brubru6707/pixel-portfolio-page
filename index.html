@@ -3,33 +3,545 @@
 <head>
     <title>Bruno Rodriguez-Mendez Portfolio</title>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://brunorodriguezmendez.com/">
     <meta property="og:title" content="Bruno Rodriguez-Mendez">
     <meta property="og:author" content="Bruno Rodriguez-Mendez">
     <meta property="og:description" content="BrownU Software Engineer">
     <link rel="icon" href="/assets/brubru.jpg" type="image/JPG">
-    <title>My Pixel Game Portfolio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; }
-        canvas { display: block; }
+        /*
+         * Layering plan (fixes game-world-over-iframe bugs):
+         *   canvas (game world)        z: auto (bottom)
+         *   .world-preview             z: 5    (small in-world previews)
+         *   #mode-toggle               z: 1500
+         *   #project-modal             z: 2000
+         *   .subpage-frame             z: 3000 (full "sub-page")
+         *   .subpage-esc               z: 3500 (back button)
+         */
         body {
             margin: 0;
-            overflow:hidden;
+            overflow: hidden;
+            touch-action: none;
         }
         canvas {
-                display: block;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
+        img {
+            image-rendering: pixelated;
+        }
+
+        /* Small in-world previews (subdomain iframes/snapshots + computer screen) */
+        .world-preview {
+            position: absolute;
+            z-index: 5;
+            pointer-events: none;
+            border: 2px solid white;
+            background-color: #000;
+            transition: box-shadow 0.7s ease;
+        }
+        body.mode-3d .world-preview {
+            box-shadow: 3px 3px 0 #6a6a6a, 6px 6px 0 #4c4c4c, 9px 9px 0 #303030;
+        }
+        body.mode-3d .world-preview--scaled {
+            /* These live inside a scale() transform, so shadows need bigger px values */
+            box-shadow: 14px 14px 0 #6a6a6a, 28px 28px 0 #4c4c4c, 42px 42px 0 #303030;
+        }
+        /* Never let world previews bleed over an open sub-page or modal */
+        body.subpage-open .world-preview,
+        body.modal-open .world-preview {
+            display: none !important;
+        }
+        body.subpage-open #mode-toggle,
+        body.modal-open #mode-toggle {
+            display: none;
+        }
+
+        /* First-person (DOOM) mode: the raycaster overlay owns the screen, so
+           hide the DOM world previews behind it. Also hide the overlay + its
+           slider panel whenever a sub-page or modal is open. */
+        body.mode-doom .world-preview {
+            display: none !important;
+        }
+        body.subpage-open #doom-canvas,
+        body.modal-open #doom-canvas,
+        body.subpage-open #doom-controls,
+        body.modal-open #doom-controls {
+            display: none !important;
+        }
+
+        /* Full-screen sub-page shown after cutting down an entity */
+        .subpage-frame {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            background: #000;
+            z-index: 3000;
+        }
+        /* Clean pixel "BACK" button for sub-pages (replaces the esc-key image) */
+        .subpage-back {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top));
+            right: 16px;
+            z-index: 3500;
+            padding: 12px 16px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        /* 2D / 3D world mode toggle */
+        #mode-toggle {
+            position: fixed;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            right: 20px;
+            width: 64px;
+            height: 64px;
+            z-index: 1500;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 14px;
+            line-height: 1;
+            color: #c6ff33;
+            background: #1b1b2f;
+            border: 3px solid #c6ff33;
+            box-shadow: 4px 4px 0 #000;
+            cursor: pointer;
+            image-rendering: pixelated;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #mode-toggle:active {
+            transform: translate(3px, 3px);
+            box-shadow: 1px 1px 0 #000;
+        }
+        /* Clean "flip to the other dimension" instead of the old 360 spin */
+        #mode-toggle.flipping {
+            animation: modeFlip 0.3s ease;
+        }
+        @keyframes modeFlip {
+            0%   { transform: perspective(240px) rotateY(0deg); }
+            50%  { transform: perspective(240px) rotateY(90deg); }
+            100% { transform: perspective(240px) rotateY(0deg); }
+        }
+        @media (max-width: 600px) {
+            #mode-toggle {
+                width: 52px;
+                height: 52px;
+                font-size: 11px;
+            }
+        }
+
+        /* ---------------------------------------------------------------
+           Stable DOM HUD (replaces the buggy floating F / ESC Phaser
+           sprites). Fixed positions instead of per-frame repositioning.
+           --------------------------------------------------------------- */
+        .pixel-hud-btn {
+            font-family: 'Press Start 2P', monospace;
+            color: #c6ff33;
+            background: #1b1b2f;
+            border: 3px solid #c6ff33;
+            box-shadow: 4px 4px 0 #000;
+            image-rendering: pixelated;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .pixel-hud-btn:active,
+        .pixel-hud-btn.pressed {
+            transform: translate(3px, 3px);
+            box-shadow: 1px 1px 0 #000;
+        }
+
+        /* Action / chop button — the universal "interact" control */
+        #action-btn {
+            position: fixed;
+            bottom: max(96px, calc(env(safe-area-inset-bottom) + 96px));
+            right: 20px;
+            width: 76px;
+            height: 76px;
+            font-size: 28px;
+            z-index: 1500;
+            flex-direction: column;
+            gap: 3px;
+            line-height: 1;
+        }
+        #action-btn .action-label {
+            font-size: 8px;
+            color: #7ea82a;
+        }
+        /* Axe icon cropped from the first frame of the 4-frame axe spritesheet
+           (48x15). Used instead of a ⚔ glyph, which the pixel font lacks. */
+        .axe-icon {
+            display: inline-block;
+            height: 1.2em;
+            aspect-ratio: 12 / 15;
+            vertical-align: middle;
+            background: url('assets/axe.png') left center / auto 100% no-repeat;
+            image-rendering: pixelated;
+        }
+        #action-btn .axe-icon { height: 34px; }
+        .tutorial-key .axe-icon { height: 26px; }
+        .tutorial-row b .axe-icon { height: 15px; }
+        /* Subtle highlight when in range (the real "you can chop" cue is the
+           stream of little green particles flowing out of the button — see
+           .axe-particle below, spawned from JS). */
+        #action-btn.hint {
+            color: #eaffb0;
+            border-color: #eaffb0;
+        }
+        #action-btn.hint .action-label { color: #eaffb0; }
+
+        /* Little green pixels that flow out of the action button while it glows */
+        .axe-particle {
+            position: fixed;
+            background: #c6ff33;
+            box-shadow: 0 0 3px #c6ff33;
+            image-rendering: pixelated;
+            pointer-events: none;
+            z-index: 1499;
+            animation: axeParticleFly 0.85s ease-out forwards;
+        }
+        @keyframes axeParticleFly {
+            0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+            18%  { opacity: 1; }
+            100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, -60px)) scale(0.25); }
+        }
+        @media (max-width: 600px) {
+            #action-btn { width: 66px; height: 66px; font-size: 24px; }
+        }
+
+        /* DOOM first-person on-screen movement pad (touch devices, 3D only) */
+        #doom-touch {
+            position: fixed;
+            bottom: max(24px, env(safe-area-inset-bottom));
+            left: 20px;
+            z-index: 1500;
+            display: none;
+            grid-template-columns: repeat(3, 58px);
+            grid-template-rows: repeat(3, 58px);
+            gap: 6px;
+        }
+        #doom-touch .pixel-hud-btn { font-size: 22px; }
+        #doom-touch [data-doom="fwd"]   { grid-area: 1 / 2; }
+        #doom-touch [data-doom="left"]  { grid-area: 2 / 1; }
+        #doom-touch [data-doom="right"] { grid-area: 2 / 3; }
+        #doom-touch [data-doom="back"]  { grid-area: 3 / 2; }
+        body.touch.mode-doom #doom-touch { display: grid; }
+        @media (max-width: 600px) {
+            #doom-touch { grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px); }
+        }
+
+        /* Small "?" button to reopen the controls tutorial (2D only) */
+        #help-btn {
+            position: fixed;
+            bottom: max(24px, env(safe-area-inset-bottom));
+            left: 20px;
+            width: 44px;
+            height: 44px;
+            font-size: 18px;
+            z-index: 1500;
+        }
+        body.mode-doom #help-btn { display: none; }
+
+        /* Music on/off toggle — sits right next to the "?" button */
+        #music-btn {
+            position: fixed;
+            bottom: max(24px, env(safe-area-inset-bottom));
+            left: 74px;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            z-index: 1500;
+        }
+        body.mode-doom #music-btn { display: none; }
+        .music-icon {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background: center / contain no-repeat;
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1 6 L4 6 L8 2 L8 14 L4 10 L1 10 Z' fill='%23c6ff33'/><path d='M10 5 Q13 8 10 11' fill='none' stroke='%23c6ff33' stroke-width='1.4'/><path d='M12 3 Q16 8 12 13' fill='none' stroke='%23c6ff33' stroke-width='1.4'/></svg>");
+        }
+        #music-btn.off {
+            border-color: #6a6a78;
+            color: #6a6a78;
+        }
+
+        /* Exit button — clears the visitor choice + reloads. Next to the music btn. */
+        #exit-btn {
+            position: fixed;
+            bottom: max(24px, env(safe-area-inset-bottom));
+            left: 128px;
+            height: 44px;
+            padding: 0 12px;
+            font-size: 12px;
+            z-index: 1500;
+        }
+        body.mode-doom #exit-btn { display: none; }
+        #music-btn.off .music-icon {
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1 6 L4 6 L8 2 L8 14 L4 10 L1 10 Z' fill='%23888'/><path d='M10 4 L15 12' stroke='%23ff5555' stroke-width='1.7'/><path d='M15 4 L10 12' stroke='%23ff5555' stroke-width='1.7'/></svg>");
+        }
+
+        /* ---- Player hearts (top-right, just left of the minimap camera) ---- */
+        #hearts-hud {
+            position: fixed;
+            top: 24px;
+            right: 186px;          /* minimap is 150px wide, inset 20px from the right edge */
+            display: flex;
+            gap: 8px;
+            z-index: 1500;
+            pointer-events: none;
+        }
+        .heart {
+            position: relative;
+            width: 34px;
+            height: 34px;
+            image-rendering: pixelated;
+            background: center / 74% no-repeat;
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'><g fill='%23ff3b3b'><rect x='1' width='2' height='1'/><rect x='4' width='2' height='1'/><rect y='1' width='7' height='3'/><rect x='1' y='4' width='5' height='1'/><rect x='2' y='5' width='3' height='1'/><rect x='3' y='6' width='1' height='1'/></g></svg>");
+            /* Glass backing: translucent rounded pane behind the pixel heart */
+            border-radius: 9px;
+            background-color: rgba(255, 90, 120, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            box-shadow:
+                0 2px 6px rgba(0, 0, 0, 0.45),
+                inset 0 1px 2px rgba(255, 255, 255, 0.55),
+                0 0 10px rgba(255, 59, 59, 0.35);
+            filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.55));
+            transition: transform 0.1s;
+        }
+        /* Glossy diagonal sheen sweeping across the top of the glass heart */
+        .heart::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 9px;
+            pointer-events: none;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 38%, rgba(255, 255, 255, 0) 60%);
+        }
+        /* Empty slot: dim, greyed-out husk left behind after a heart blows */
+        .heart.lost {
+            filter: grayscale(1) brightness(0.45) drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6));
+            opacity: 0.5;
+        }
+        /* Pop-and-shrink when a bomb destroys this heart */
+        .heart.exploding { animation: heartExplode 0.42s steps(7) forwards; }
+        @keyframes heartExplode {
+            0%   { transform: scale(1)   rotate(0deg);  opacity: 1; }
+            30%  { transform: scale(1.7) rotate(-10deg); opacity: 1; }
+            60%  { transform: scale(2)   rotate(12deg);  opacity: 1; }
+            100% { transform: scale(0.1) rotate(0deg);   opacity: 0; }
+        }
+        /* Red pixels bursting out of the heart when it explodes */
+        .heart-particle {
+            position: fixed;
+            image-rendering: pixelated;
+            pointer-events: none;
+            z-index: 1600;
+            animation: heartParticleFly 0.7s ease-out forwards;
+        }
+        @keyframes heartParticleFly {
+            0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.2); }
+        }
+
+        /* ---- Tree-cut score (persisted), sits just left of the hearts ---- */
+        #score-hud {
+            position: fixed;
+            top: 24px;
+            right: 314px;         /* immediately left of #hearts-hud (right:186px + ~118px wide) */
+            height: 34px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 10px 0 8px;
+            z-index: 1500;
+            pointer-events: none;
+            border-radius: 9px;
+            background-color: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.45);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            color: #c6ff33;
+            text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+        }
+        #score-hud .score-icon {
+            width: 22px;
+            height: 22px;
+            image-rendering: pixelated;
+            background: center / contain no-repeat url("assets/tree.png");
+        }
+
+        /* Hide all HUD controls behind an open sub-page or modal */
+        body.subpage-open #action-btn,   body.modal-open #action-btn,
+        body.subpage-open #doom-touch,    body.modal-open #doom-touch,
+        body.subpage-open #help-btn,      body.modal-open #help-btn,
+        body.subpage-open #hearts-hud,    body.modal-open #hearts-hud,
+        body.subpage-open #score-hud,     body.modal-open #score-hud,
+        body.subpage-open #exit-btn,      body.modal-open #exit-btn,
+        body.subpage-open #music-btn,     body.modal-open #music-btn {
+            display: none !important;
+        }
+        /* Keep HUD hidden until the world scene has built it */
+        body:not(.hud-ready) #action-btn,
+        body:not(.hud-ready) #music-btn,
+        body:not(.hud-ready) #exit-btn,
+        body:not(.hud-ready) #hearts-hud,
+        body:not(.hud-ready) #score-hud,
+        body:not(.hud-ready) #help-btn { display: none; }
+
+        /* ---- Pixelated controls / tutorial popup ---- */
+        #tutorial-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 4000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.82);
+            font-family: 'Press Start 2P', monospace;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #tutorial-overlay.open { display: flex; }
+        .tutorial-card {
+            width: 100%;
+            max-width: 470px;
+            max-height: 88vh;
+            overflow-y: auto;
+            padding: 20px 18px 22px;
+            background: #12121e;
+            border: 4px solid #c6ff33;
+            box-shadow: 8px 8px 0 #000;
+            color: #e8e8e8;
+            image-rendering: pixelated;
+        }
+        .tutorial-card h2 {
+            margin: 0 0 16px;
+            color: #c6ff33;
+            font-size: 15px;
+            line-height: 1.5;
+            text-align: center;
+        }
+        .tutorial-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 13px 0;
+            font-size: 10px;
+            line-height: 1.7;
+        }
+        .tutorial-key {
+            flex: 0 0 auto;
+            min-width: 46px;
+            padding: 8px 6px;
+            text-align: center;
+            background: #1b1b2f;
+            border: 2px solid #c6ff33;
+            box-shadow: 3px 3px 0 #000;
+            color: #c6ff33;
+            font-size: 12px;
+        }
+        .tutorial-start {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            color: #12121e;
+            background: #c6ff33;
+            border: none;
+            box-shadow: 4px 4px 0 #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tutorial-start:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
+        .tutorial-note {
+            margin-top: 14px;
+            font-size: 8px;
+            line-height: 1.8;
+            color: #7a7a8a;
+            text-align: center;
+        }
+        /* Bright pixel sparks that shine out from all around the tutorial card */
+        .tutorial-spark {
+            position: fixed;
+            z-index: 4050;
+            image-rendering: pixelated;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            animation: tutorialSparkFly 0.9s ease-out forwards;
+        }
+        @keyframes tutorialSparkFly {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+            25%  { opacity: 1; transform: translate(calc(-50% + var(--dx, 0) * 0.4), calc(-50% + var(--dy, 0) * 0.4)) scale(1.3); }
+            100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0)), calc(-50% + var(--dy, 0))) scale(0.2); }
+        }
+
+        /* Transient pixel toast (e.g. first-time DOOM controls hint) */
+        #hud-toast {
+            position: fixed;
+            left: 50%;
+            top: 16%;
+            transform: translateX(-50%);
+            z-index: 3800;
+            display: none;
+            max-width: 80vw;
+            padding: 12px 14px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            line-height: 1.8;
+            text-align: center;
+            color: #c6ff33;
+            background: rgba(18, 18, 30, 0.95);
+            border: 3px solid #c6ff33;
+            box-shadow: 4px 4px 0 #000;
+            pointer-events: none;
+        }
+        #hud-toast.show { display: block; }
+
+        /* Close button for the orb modal (replaces the ESC key sprite hint) */
+        #modal-close {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            width: 34px;
+            height: 34px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 13px;
+            color: #c6ff33;
+            background: #1b1b2f;
+            border: 2px solid #c6ff33;
+            box-shadow: 3px 3px 0 #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #modal-close:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+
         #project-modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            /* backdrop-filter: blur(6px); */
-            /* background-color: rgba(0, 0, 0, 0.4); */
-            z-index: 10;
+            z-index: 2000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -39,6 +551,7 @@
 
         /* this is the css for the modal popup */
         .modal-content {
+            position: relative;
             background: #111;
             padding: 20px;
             border: 2px solid white;
@@ -55,27 +568,223 @@
         }
 
         .modal-content iframe {
-            max-width: 100%;
+            width: 100%;
+            max-width: 320px;
+            aspect-ratio: 16 / 9;
             height: auto;
             border: none;
         }
 
+        /* ============================================================
+           Visitor gate — "Who are you?" splash shown before entry.
+           Default: clean regular font. Hovering "Everyone Else" flips
+           the whole message to the pixel font and sprays rainbow pixels.
+           ============================================================ */
+        #visitor-gate {
+            position: fixed;
+            inset: 0;
+            z-index: 9000;
+            display: none;   /* hidden until the intro animation finishes (.shown) */
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            transition: opacity 0.45s ease;
+        }
+        #visitor-gate.shown { display: flex; }
+        #visitor-gate.hidden { opacity: 0; pointer-events: none; }
+        .gate-inner {
+            text-align: center;
+            padding: 40px 48px;
+            max-width: 90vw;
+            border: 4px solid #c6ff33;      /* axe-icon green frame around the message */
+            border-radius: 0;
+            box-shadow: 8px 8px 0 #000;
+        }
+        .gate-title {
+            color: #f5f5f5;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: clamp(28px, 7vw, 64px);
+            font-weight: 700;
+            margin: 0 0 40px;
+            letter-spacing: 0.5px;
+            position: relative;
+            /* Fixed height so the font/size swap in pixel mode doesn't shift the
+               buttons below it (a source of the corner-hover flicker). */
+            min-height: 84px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gate-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .gate-btn {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: clamp(15px, 3.4vw, 22px);
+            font-weight: 600;
+            color: #f5f5f5;
+            background: transparent;
+            border: 2px solid #f5f5f5;
+            border-radius: 0;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, transform 0.1s;
+            /* Fixed box so switching to the wide pixel font never reflows the
+               button — that reflow is what made the corner hover spaz. */
+            box-sizing: border-box;
+            min-width: 260px;
+            height: 66px;
+            padding: 0 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gate-btn:hover { background: #f5f5f5; color: #05050a; }
+        .gate-btn:active { transform: translateY(2px); }
+
+        /* Pixel mode — applied to the whole gate while "Everyone Else" is hovered */
+        #visitor-gate.gate-pixel .gate-title,
+        #visitor-gate.gate-pixel .gate-btn {
+            font-family: "Press Start 2P", monospace;
+            letter-spacing: 0;
+        }
+        #visitor-gate.gate-pixel .gate-title {
+            font-size: clamp(20px, 5vw, 46px);
+            text-shadow: 3px 3px 0 #000;
+        }
+        #visitor-gate.gate-pixel .gate-btn {
+            font-size: clamp(11px, 2.6vw, 18px);
+            box-shadow: 4px 4px 0 #000;
+        }
+        #visitor-gate.gate-pixel .gate-btn--everyone {
+            border-color: #c6ff33;
+            color: #c6ff33;
+        }
+        #visitor-gate.gate-pixel .gate-btn--everyone:hover {
+            background: #c6ff33; color: #05050a;
+        }
+
+        /* Rainbow pixels that shoot out of the words on hover */
+        .gate-spark {
+            position: fixed;
+            image-rendering: pixelated;
+            pointer-events: none;
+            z-index: 9001;
+            animation: gateSparkFly 0.75s ease-out forwards;
+        }
+        @keyframes gateSparkFly {
+            0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, -40px)) scale(0.2); }
+        }
     </style>
 </head>
 <body>
+    <!-- Visitor gate: shown before entry unless a choice is already saved -->
+    <div id="visitor-gate">
+        <div class="gate-inner">
+            <h1 class="gate-title">Who are you?</h1>
+            <div class="gate-buttons">
+                <button class="gate-btn gate-btn--recruiter" data-visitor="recruiter">Recruiter</button>
+                <button class="gate-btn gate-btn--everyone" data-visitor="everyone">Everyone Else</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var gate = document.getElementById('visitor-gate');
+            var PERSONAL = 'personalWebsite/index.html';
+            // NOTE: routing on load lives in IntroScene now — the intro animation
+            // always plays first, and only when it finishes is this gate revealed
+            // (via window.showVisitorGate, below) or the saved choice auto-routed.
+            var title = gate.querySelector('.gate-title');
+            var everyone = gate.querySelector('.gate-btn--everyone');
+            var rainbow = ['#ff2d55', '#ff9500', '#ffe500', '#34d158', '#00c7ff', '#5e5ce6', '#ff2dd4'];
+            var sparkTimer = null;
+            var everyoneCb = null;   // set by showVisitorGate: starts the game
+
+            // Spray rainbow pixels from around the title + the hovered button.
+            function spawnSparks() {
+                if (!gate.classList.contains('gate-pixel')) return;
+                [title, everyone].forEach(function (el) {
+                    var r = el.getBoundingClientRect();
+                    var per = 2 * (r.width + r.height);
+                    for (var i = 0; i < 3; i++) {
+                        var d = Math.random() * per, x, y, nx, ny;
+                        if (d < r.width) { x = r.left + d; y = r.top; nx = 0; ny = -1; }
+                        else if (d < r.width + r.height) { x = r.right; y = r.top + (d - r.width); nx = 1; ny = 0; }
+                        else if (d < 2 * r.width + r.height) { x = r.right - (d - r.width - r.height); y = r.bottom; nx = 0; ny = 1; }
+                        else { x = r.left; y = r.bottom - (d - 2 * r.width - r.height); nx = -1; ny = 0; }
+                        var p = document.createElement('div');
+                        p.className = 'gate-spark';
+                        var size = 3 + Math.floor(Math.random() * 5);
+                        p.style.width = p.style.height = size + 'px';
+                        var col = rainbow[Math.floor(Math.random() * rainbow.length)];
+                        p.style.background = col;
+                        p.style.boxShadow = '0 0 6px ' + col;
+                        p.style.left = x + 'px';
+                        p.style.top = y + 'px';
+                        var dist = 16 + Math.random() * 40, spread = (Math.random() - 0.5) * 30;
+                        p.style.setProperty('--dx', (nx * dist + (ny !== 0 ? spread : 0)).toFixed(0) + 'px');
+                        p.style.setProperty('--dy', (ny * dist + (nx !== 0 ? spread : 0)).toFixed(0) + 'px');
+                        p.addEventListener('animationend', function () { this.remove(); });
+                        document.body.appendChild(p);
+                    }
+                });
+            }
+
+            everyone.addEventListener('mouseenter', function () {
+                gate.classList.add('gate-pixel');
+                clearInterval(sparkTimer);
+                sparkTimer = setInterval(spawnSparks, 70);
+                spawnSparks();
+            });
+            everyone.addEventListener('mouseleave', function () {
+                gate.classList.remove('gate-pixel');
+                clearInterval(sparkTimer);
+                sparkTimer = null;
+            });
+
+            function choose(type) {
+                try { localStorage.setItem('visitorType', type); } catch (e) {}
+                clearInterval(sparkTimer);
+                if (type === 'recruiter') {
+                    // Straight to the personal site (rendered without the pixel font).
+                    window.location.href = PERSONAL;
+                    return;
+                }
+                // Everyone Else: fade the gate out, then start the game.
+                gate.classList.add('hidden');
+                setTimeout(function () {
+                    gate.remove();
+                    if (typeof everyoneCb === 'function') everyoneCb();
+                }, 500);
+            }
+            gate.querySelectorAll('.gate-btn').forEach(function (b) {
+                b.addEventListener('click', function () { choose(b.dataset.visitor); });
+            });
+
+            // Called by IntroScene once the intro animation completes (first-time
+            // visitors only). Reveals the gate and remembers how to start the game.
+            window.showVisitorGate = function (onEveryone) {
+                everyoneCb = onEveryone || null;
+                gate.classList.add('shown');
+            };
+        })();
+    </script>
+
     <div id="project-modal" style="display: none;">
         <div class="modal-content">
+          <button id="modal-close" aria-label="Close">X</button>
           <h1 id="modal-title">Project Title</h1>
           <p id="modal-description">Project description here...</p>
           <iframe id="modal-video" width="320" height="180" src="" frameborder="0" allowfullscreen></iframe>
         </div>
       </div>
-      
+
     <!-- Load Phaser first -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
-
-    <!-- Load dat.GUI -->
-    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
 
     <!-- Then load your game -->
     <script type="module" src="src/game.js"></script>

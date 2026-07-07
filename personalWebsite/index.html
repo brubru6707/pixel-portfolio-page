@@ -17,13 +17,14 @@
 </head>
 <body>
     <div id="background"></div>
+    <div id="goop-layer"></div>
     <header>
         <div id="title-name">
             Bruno Rodriguez-Mendez
         </div>
         <nav id="nav-menu">
             <a href="#intro-holder" class="nav-link">About</a>
-            <a href="#proj-holder" class="nav-link">Projects</a>
+            <a href="#featured-holder" class="nav-link">Featured</a>
             <a href="#archived-projects" class="nav-link">Archive</a>
             <a href="#experience-holder" class="nav-link">Experience</a>
             <a href="#awards-holder" class="nav-link">Awards</a>
@@ -32,9 +33,6 @@
         <div id="title-info">
             <div id="title-info-job">
                 Software Engineer
-            </div>
-            <div id="title-info-years">
-                4+ Years Experience
             </div>
         </div>
     </header>
@@ -49,78 +47,122 @@
             and contributed to startups. From cybersecurity tools to AI research—my code has purpose.
         </div>
     </div>
-    <div id="proj-holder">
-    <h1 id="proj-header">Projects</h1>
-    <div id="proj">
-
-        <div id="proj-software">
-            <div class="proj-examples">
-                <div class="proj-example-shelf">                
-                    <div class="proj-example" onclick="openModal()">Cleaning Website</div>
-                    <div class="proj-example" onclick="openModal()">SAT Study Website</div>
-                </div>
-                <div class="proj-topic">Software</div>
-                <div class="proj-example-shelf">
-                    <div class="proj-example" onclick="openModal()">Sandbox Game</div>
-                    <div class="proj-example" onclick="openModal()">Raycaster</div>
-                </div>
-            </div>
+    <div id="featured-holder" class="space">
+        <h1 id="featured-header">Featured</h1>
+        <div id="featured-grid">
+            <a class="featured-card" href="https://www.tryshapeup.cc/" target="_blank" rel="noopener">
+                <div class="featured-thumb"><img src="/assets/subdomains/shape-up.png" alt="Shape Up" loading="lazy"></div>
+                <div class="featured-title">Shape Up</div>
+            </a>
+            <a class="featured-card" href="https://www.bloom-pots.com/" target="_blank" rel="noopener">
+                <div class="featured-thumb"><img src="/assets/subdomains/bloom.png" alt="Bloom" loading="lazy"></div>
+                <div class="featured-title">Bloom</div>
+            </a>
+            <a class="featured-card" href="https://github.com/brubru6707/hungry-chippos-chipathon-2026" target="_blank" rel="noopener">
+                <div class="featured-thumb"><img src="/assets/other-projects/chipathon.png" alt="Chipathon 2026" loading="lazy"></div>
+                <div class="featured-title">Chipathon 2026</div>
+            </a>
         </div>
-        <div id="proj-robotics">
-            <div class="proj-examples">
-                <div class="proj-example-shelf">
-                    <div class="proj-example" onclick="openModal()">Battery Bank (e-waste)</div>
-                    <div class="proj-example" onclick="openModal()">Circuit</div>
-                </div>
-                <div class="proj-topic">Robotics</div>
-                <div class="proj-example-shelf">
-                    <div class="proj-example" onclick="openModal()">Inventory System</div>
-                    <div class="proj-example" onclick="openModal()">Lego Cars</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     </div>
     <div id="archived-projects" class="space" style="width: 70vw; margin-left: 15vw; margin-top: 50px; margin-bottom: 50px;">
         <h1 style="text-align: center;">Archived Projects</h1>
         <p style="text-align: center; font-size: 0.9em; opacity: 0.8; margin-bottom: 40px;">These are some of my earlier projects from high school. While they may no longer be actively maintained or fully functional, they represent important learning experiences and milestones in my development journey.</p>
-        <div style="display: flex; flex-direction: column; gap: 25px;">
+        <div id="archived-list" style="display: flex; flex-direction: column; gap: 25px;">
             <div class="archived-project-item">
-                <h3>AI Arsenal</h3>
-                <p>A centralized hub for multiple AI models, allowing users to compare responses from different AI systems without navigating between multiple websites. Built to streamline AI interaction and comparison.</p>
+                <div class="archived-thumb"><img src="/assets/subdomains/ai-arsenal.png" alt="AI Arsenal" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>AI Arsenal</h3>
+                    <p>A centralized hub for multiple AI models, allowing users to compare responses from different AI systems without navigating between multiple websites. Built to streamline AI interaction and comparison.</p>
+                </div>
             </div>
             <div class="archived-project-item">
-                <h3>Anarchy Clipboard</h3>
-                <p>An anonymous image-sharing platform where users can freely post content without registration. Explored concepts of anonymous web services and image hosting.</p>
+                <div class="archived-thumb"><img src="/assets/subdomains/anarchy-clipboard.png" alt="Anarchy Clipboard" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>Anarchy Clipboard</h3>
+                    <p>An anonymous image-sharing platform where users can freely post content without registration. Explored concepts of anonymous web services and image hosting.</p>
+                </div>
             </div>
-            <div class="archived-project-item">
-                <h3>Checkers Game</h3>
-                <p>A multiplayer checkers game with real-time gameplay. Built to practice game logic, state management, and multiplayer networking.</p>
+            <div class="archived-project-item collapsed">
+                <div class="archived-thumb"><img src="/assets/subdomains/checkers-game.png" alt="Checkers Game" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>Checkers Game</h3>
+                    <p>A multiplayer checkers game with real-time gameplay. Built to practice game logic, state management, and multiplayer networking.</p>
+                </div>
             </div>
-            <div class="archived-project-item">
-                <h3>Cyber Insurance Model</h3>
-                <p>A data visualization project created for a high school assignment that demonstrates the financial impact of cyber insurance on companies. Compares outcomes between insured and uninsured organizations facing cyber incidents.</p>
+            <div class="archived-project-item collapsed">
+                <div class="archived-thumb"><img src="/assets/subdomains/cyber-insurance-model.png" alt="Cyber Insurance Model" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>Cyber Insurance Model</h3>
+                    <p>A data visualization project created for a high school assignment that demonstrates the financial impact of cyber insurance on companies. Compares outcomes between insured and uninsured organizations facing cyber incidents.</p>
+                </div>
             </div>
-            <div class="archived-project-item">
-                <h3>NTS Study Buddy</h3>
-                <p>An SAT preparation tool covering English, writing, and math sections. Features practice questions, progress tracking, and study resources to help students prepare for standardized testing. Attracted 200+ users during its active period.</p>
+            <div class="archived-project-item collapsed">
+                <div class="archived-thumb"><img src="/assets/subdomains/nts-study-buddy.png" alt="NTS Study Buddy" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>NTS Study Buddy</h3>
+                    <p>An SAT preparation tool covering English, writing, and math sections. Features practice questions, progress tracking, and study resources to help students prepare for standardized testing. Attracted 200+ users during its active period.</p>
+                </div>
             </div>
-            <div class="archived-project-item">
-                <h3>OHS Chess Club Website</h3>
-                <p>Official landing page for Ocoee High School's Chess Club. Created and maintained the site to promote club activities, share meeting schedules, and showcase member achievements.</p>
+            <div class="archived-project-item collapsed">
+                <div class="archived-thumb"><img src="/assets/subdomains/ohs-chess-club.png" alt="OHS Chess Club Website" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>OHS Chess Club Website</h3>
+                    <p>Official landing page for Ocoee High School's Chess Club. Created and maintained the site to promote club activities, share meeting schedules, and showcase member achievements.</p>
+                </div>
             </div>
-            <div class="archived-project-item">
-                <h3>OHS Key Club Website</h3>
-                <p>Official website for Ocoee High School's Key Club chapter. Built to communicate service projects, volunteer opportunities, and club leadership information to members and the school community.</p>
+            <div class="archived-project-item collapsed">
+                <div class="archived-thumb"><img src="/assets/subdomains/ohs-key-club.png" alt="OHS Key Club Website" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>OHS Key Club Website</h3>
+                    <p>Official website for Ocoee High School's Key Club chapter. Built to communicate service projects, volunteer opportunities, and club leadership information to members and the school community.</p>
+                </div>
             </div>
-            <div class="archived-project-item">
-                <h3>Old Portfolio</h3>
-                <p>My previous portfolio website showcasing earlier projects and skills. Preserved as a record of my growth as a developer.</p>
+            <div class="archived-project-item collapsed">
+                <div class="archived-thumb"><img src="/assets/subdomains/old-portfolio.png" alt="Old Portfolio" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>Old Portfolio</h3>
+                    <p>My previous portfolio website showcasing earlier projects and skills. Preserved as a record of my growth as a developer.</p>
+                </div>
             </div>
-            <div class="archived-project-item">
-                <h3>RAG for "A Handful of Dust"</h3>
-                <p>An experimental Retrieval-Augmented Generation (RAG) application designed to parse and analyze Evelyn Waugh's novel "A Handful of Dust." Created to assist with a book analysis assignment on this lesser-known literary work by enabling semantic search and question-answering about the text.</p>
+            <div class="archived-project-item collapsed">
+                <div class="archived-thumb"><img src="/assets/subdomains/rag-for-hod-book.png" alt="RAG for A Handful of Dust" loading="lazy"></div>
+                <div class="archived-text">
+                    <h3>RAG for "A Handful of Dust"</h3>
+                    <p>An experimental Retrieval-Augmented Generation (RAG) application designed to parse and analyze Evelyn Waugh's novel "A Handful of Dust." Created to assist with a book analysis assignment on this lesser-known literary work by enabling semantic search and question-answering about the text.</p>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 30px;">
+            <button id="archived-load-more" class="load-more-btn" type="button">Load More</button>
+        </div>
+    </div>
+    <div id="proj-holder" class="space">
+        <h1 id="proj-header">Projects</h1>
+        <p id="proj-hint">Tap a category to see the projects inside.</p>
+        <div id="proj">
+            <div class="proj-category">
+                <button class="proj-cat-header" type="button" data-target="cat-software">
+                    <span class="proj-cat-label">Software</span>
+                    <span class="proj-cat-arrow">▸</span>
+                </button>
+                <div class="proj-cat-items" id="cat-software">
+                    <div class="proj-example" onclick="openModal()">Cleaning Website</div>
+                    <div class="proj-example" onclick="openModal()">SAT Study Website</div>
+                    <div class="proj-example" onclick="openModal()">Sandbox Game</div>
+                    <div class="proj-example" onclick="openModal()">Raycaster</div>
+                </div>
+            </div>
+            <div class="proj-category">
+                <button class="proj-cat-header" type="button" data-target="cat-hardware">
+                    <span class="proj-cat-label">Hardware</span>
+                    <span class="proj-cat-arrow">▸</span>
+                </button>
+                <div class="proj-cat-items" id="cat-hardware">
+                    <div class="proj-example" onclick="openModal()">Battery Bank (e-waste)</div>
+                    <div class="proj-example" onclick="openModal()">Circuit</div>
+                    <div class="proj-example" onclick="openModal()">Inventory System</div>
+                    <div class="proj-example" onclick="openModal()">Lego Cars</div>
+                </div>
             </div>
         </div>
     </div>
@@ -171,12 +213,15 @@
                     <li><strong>Florida Bright Futures Academic Scholar</strong> - State merit-based scholarship</li>
                     <li><strong>Penn Early Exploration Program</strong> - Selected from competitive national pool</li>
                     <li><strong>Valencia College President's List</strong> - Multiple terms with 3.75+ GPA</li>
-                    <li><strong>Jason Bearid Memorial Recipient</strong> - Academic excellence and service</li>
+                    <li><strong>Jason Beaird Foundation Recipient</strong> - Academic excellence and service</li>
                     <li><strong>Florida Realtors Scholarship</strong> - Leadership and community involvement</li>
                     <li><strong>Youth Climate Project Scholarship</strong> - Environmental innovation video</li>
                     <li><strong>National Hispanic Recognition</strong> - Academic achievement recognition</li>
                     <li><strong>Posse Nominee</strong> - Leadership and academic potential</li>
                 </ul>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button id="awards-load-more" class="load-more-btn" type="button">Load More</button>
+                </div>
             </div>
         </div>
         <div class="space" id="edu-holder">
@@ -239,12 +284,6 @@
                 <a href="https://www.linkedin.com/in/bruno-rodriguez-mendez-18723725b/" target="_blank" class="social-link">
                     <div class="social-social">
                     <i class="fab fa-linkedin"></i>
-                    </div>
-                </a>
-                
-                <a href="https://www.instagram.com/brubru6707/" target="_blank" class="social-link">
-                    <div class="social-social">
-                    <i class="fab fa-instagram"></i>
                     </div>
                 </a>
                 </div>
