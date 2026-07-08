@@ -55,5 +55,4 @@ There's no automated test suite. At minimum, before opening a PR:
 
 - Keep PRs focused — one feature or fix per PR.
 - Describe what you changed and why, and how you tested it (desktop/mobile, which browsers).
-- By submitting a PR, you agree your contribution is licensed under this repo's
-  [LICENSE](LICENSE) (PolyForm Noncommercial 1.0.0).
+- By submitting a PR, you agree your contribution is licensed under this repo's [MIT LICENSE](LICENSE).

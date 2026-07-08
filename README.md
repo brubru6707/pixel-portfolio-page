@@ -64,5 +64,4 @@ things locally and what to check before opening a PR.
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE) — free to use, run, and modify for non-commercial purposes.
-Commercial use is not permitted.
+[MIT](LICENSE)
