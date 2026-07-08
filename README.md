@@ -3,6 +3,21 @@
 Bruno Rodriguez-Mendez's portfolio, built as a pixel-art Phaser game — chop trees, explore a field,
 and cut down entities to open his projects. Live at [bruno-rodriguez-mendez.com](https://bruno-rodriguez-mendez.com).
 
+<p>
+  <img src="assets/instructions.png" height="90" alt="Press W/A/S/D or arrows to move">
+  <img src="assets/OHS.png" height="90" alt="OHS schoolhouse — chop it open to reach 6 archived projects">
+  <img src="assets/brown-university.png" height="90" alt="Brown University schoolhouse — chop it open to reach Shape Up, Bloom, and Chipathon">
+  <img src="assets/exit.png" height="90" alt="Exit sign">
+</p>
+
+## Cast & pickups
+
+| | | | |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/tree.png" height="70"><br>Tree — chop 3x for a plank | <img src="assets/axe.png" height="50"><br>Axe (tool 1) | <img src="assets/plank.png" height="70"><br>Plank (tool 2) — walls off zombies | <img src="assets/hidden-bomb.png" height="50"><br>Hidden bomb, buried in the dirt |
+| <img src="assets/explosive.png" height="60"><br>Boom | <img src="assets/orb.png" height="70"><br>Orb — chop 3x for a surprise (my salutatorian speech) | <img src="assets/computer.png" height="50"><br>Computer — chop 3x to open the recruiter site | <img src="assets/zombie.png" height="30"><br>Zombie horde (A\* pathing) |
+| <img src="assets/bobot.png" height="70"><br>Bobot, the Terraria-Zenith-style frenzy boss | <img src="assets/cowboy.png" height="60"><br>Cowboy — stalks in from the left | <img src="assets/ghost.png" height="60"><br>Ghost — how other visitors appear (multiplayer presence) | |
+
 ## Structure
 
 - **`index.html` + `src/`** — the game (entry point). Plain ES modules + [Phaser](https://phaser.io/)
@@ -56,6 +71,27 @@ Static site, deployed via GitHub Pages with a custom domain (`CNAME`).
   tinted by the triangles they cross
 - Lightweight multiplayer: other visitors appear as ghosts (position + facing only, no interaction)
   via a small WebSocket presence server
+
+## Hidden sub-worlds
+
+Chop down the **OHS** schoolhouse to reach 6 archived projects:
+
+<p>
+  <img src="assets/subdomains/ohs-key-club.png" width="200" alt="OHS Key Club website">
+  <img src="assets/subdomains/ohs-chess-club.png" width="200" alt="OHS Chess Club website">
+  <img src="assets/subdomains/nts-study-buddy.png" width="200" alt="NTS Study Buddy">
+  <img src="assets/subdomains/checkers-game.png" width="200" alt="Checkers game">
+  <img src="assets/subdomains/old-portfolio.png" width="200" alt="Old portfolio">
+  <img src="assets/subdomains/cyber-insurance-model.png" width="200" alt="Cyber insurance model">
+</p>
+
+Chop down the **Brown** schoolhouse to reach 3 current projects:
+
+<p>
+  <img src="assets/subdomains/shape-up.png" width="260" alt="Shape Up">
+  <img src="assets/subdomains/bloom.png" width="260" alt="Bloom">
+  <img src="assets/other-projects/chipathon.png" width="260" alt="Chipathon 2026">
+</p>
 
 ## Contributing
 
