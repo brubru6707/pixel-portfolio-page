@@ -3,7 +3,7 @@ import GhostEntity from '../entities/GhostEntity.js';
 import SoundManager from '../utils/SoundManager.js';
 import DoomView from '../utils/DoomView.js';
 import NetworkManager from '../utils/NetworkManager.js';
-import { WS_URL } from '../config/network.js';
+import { WS_URL, STATS_URL } from '../config/network.js';
 
 // Tints applied to remote players' sprites (cycled by player number) so
 // multiple ghosts on screen stay visually distinct from each other and from
@@ -73,10 +73,12 @@ export default class MainScene extends Phaser.Scene {
         ];
         // Brown University sub-world — same swap as OHS, different projects.
         this.brownChops = 0;
+        // shape-up and chipathon (GitHub) both refuse to be framed (X-Frame-Options),
+        // so those two open in a new tab instead of openSubPage's iframe.
         this.brownProjects = [
-            { key: 'shape-up', label: 'shape up', url: 'https://www.tryshapeup.cc/' },
+            { key: 'shape-up', label: 'shape up', url: 'https://www.tryshapeup.cc/', newTab: true },
             { key: 'bloom', label: 'bloom', url: 'https://www.bloom-pots.com/' },
-            { key: 'chipathon', label: 'chipathon 2026', url: 'https://github.com/brubru6707/hungry-chippos-chipathon-2026' },
+            { key: 'chipathon', label: 'chipathon 2026', url: 'https://github.com/brubru6707/hungry-chippos-chipathon-2026', newTab: true },
         ];
         // Which sub-world we're inside ('ohs' | 'brown' | null). `inOhs` stays
         // as the legacy "inside ANY sub-world" flag used all over the code.
@@ -162,6 +164,7 @@ export default class MainScene extends Phaser.Scene {
         this.load.image('personal-website', 'assets/subdomains/personal-website.png');
         this.load.image('ohs-school', 'assets/OHS.png');
         this.load.image('exit-sign', 'assets/exit.png');
+        this.load.image('contribute-sign', 'assets/contribute.png');
         this.ohsProjects.forEach(p => this.load.image(p.key, `assets/subdomains/${p.key}.png`));
     }
 
@@ -185,12 +188,16 @@ export default class MainScene extends Phaser.Scene {
         // Multiplayer presence: other connected players render as translucent,
         // non-interactive "Player N" ghosts (see _syncRemotePlayers below).
         this._network = new NetworkManager(WS_URL, {
-            onState: (players) => this._syncRemotePlayers(players)
+            onState: (players) => this._syncRemotePlayers(players),
+            onConnectionChange: (connected) => this._setServerStatus(connected)
         });
 
         // Add objects in the center of the world
         this.computer = this.physics.add.staticSprite(worldWidth / 2, worldHeight / 2, 'computer', 0).setScale(15).refreshBody();
         this.orb = this.physics.add.staticSprite(worldWidth / 1.2, worldHeight / 3.5, 'orb', 0).setScale(4).refreshBody();
+        // A little below the computer's middle, offset to the right — chop it
+        // once to jump to the contributing guide.
+        this.contributeSign = this.physics.add.staticImage(worldWidth / 2 + 200, worldHeight / 2 + 550, 'contribute-sign').setScale(4).refreshBody();
         this.player = this.physics.add.sprite(worldWidth / 2 - 290, worldHeight / 2, 'me', 0).setScale(3).refreshBody();
         this.player.setCollideWorldBounds(true);
         this.axe = this.physics.add.sprite(0, 0, 'axe', 0).setVisible(false).setScale(5).refreshBody();
@@ -319,6 +326,7 @@ export default class MainScene extends Phaser.Scene {
         // Init object variables
         this.computerChops = 0;
         this.orbChops = 0;
+        this.contributeSignChops = 0;
 
         // The projects no longer wander the main world as subdomain ghosts —
         // they live in the OHS sub-world now. `this.ghosts` stays (empty here)
@@ -349,6 +357,7 @@ export default class MainScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.trees);
         this.physics.add.collider(this.player, this.computer);
         this.physics.add.collider(this.player, this.orb);
+        this.physics.add.collider(this.player, this.contributeSign);
         this.physics.add.collider(this.player, this.ohsSchool);
         this.physics.add.collider(this.player, this.brownSchool);
         this._bombOverlap = this.physics.add.overlap(this.player, this.bombs, this.triggerExplosion, null, this);
@@ -357,6 +366,7 @@ export default class MainScene extends Phaser.Scene {
         this.physics.add.overlap(this.axe, this.trees, this.cutTree, null, this);
         this.physics.add.overlap(this.axe, this.computer, this.hitComputer, null, this);
         this.physics.add.overlap(this.axe, this.orb, this.hitOrb, null, this);
+        this.physics.add.overlap(this.axe, this.contributeSign, this.hitContributeSign, null, this);
         this.physics.add.overlap(this.axe, this.ohsSchool, this.hitOhs, null, this);
         this.physics.add.overlap(this.axe, this.brownSchool, this.hitBrown, null, this);
 
@@ -366,6 +376,7 @@ export default class MainScene extends Phaser.Scene {
         this.physics.add.collider(this.zombieGroup, this.trees);
         this.physics.add.collider(this.zombieGroup, this.computer);
         this.physics.add.collider(this.zombieGroup, this.orb);
+        this.physics.add.collider(this.zombieGroup, this.contributeSign);
         this.physics.add.collider(this.zombieGroup, this.ohsSchool);
         this.physics.add.collider(this.zombieGroup, this.brownSchool);
         this.physics.add.collider(this.zombieGroup, this.zombieGroup);
@@ -656,8 +667,24 @@ export default class MainScene extends Phaser.Scene {
         this._musicBtn = music;
         this._hudEls.push(music);
 
+        // --- SFX mute toggle (footsteps/chop/smash/etc.) — independent of
+        // music, starts muted the same way. Sits right after the music button. ---
+        const sfx = document.createElement('button');
+        sfx.id = 'sfx-btn';
+        sfx.className = 'pixel-hud-btn';
+        sfx.innerHTML = '<span class="sfx-icon"></span>';
+        sfx.setAttribute('aria-label', 'Mute sound effects');
+        sfx.classList.toggle('off', this.sounds.sfxMuted);
+        sfx.addEventListener('click', () => {
+            const muted = this.sounds.toggleSfx();
+            sfx.classList.toggle('off', muted);
+        });
+        document.body.appendChild(sfx);
+        this._sfxBtn = sfx;
+        this._hudEls.push(sfx);
+
         // --- Exit button: clears the saved "who are you?" choice + reloads, so
-        // the visitor gate shows again. Sits right after the music button. ---
+        // the visitor gate shows again. Sits right after the SFX button. ---
         const exit = document.createElement('button');
         exit.id = 'exit-btn';
         exit.className = 'pixel-hud-btn';
@@ -671,7 +698,7 @@ export default class MainScene extends Phaser.Scene {
         this._exitBtn = exit;
         this._hudEls.push(exit);
 
-        // --- "zombies?" toggle + "server" button, continuing the bottom row ---
+        // --- "zombies?" / "cowboy?" toggles, continuing the bottom row ---
         const extra = document.createElement('div');
         extra.id = 'extra-btns';
 
@@ -693,29 +720,21 @@ export default class MainScene extends Phaser.Scene {
         extra.appendChild(cow);
         this._cowboyBtn = cow;
 
-        const srvWrap = document.createElement('div');
-        srvWrap.id = 'server-btn-wrap';
-        const srv = document.createElement('button');
-        srv.id = 'server-btn';
-        srv.className = 'pixel-hud-btn';
-        srv.textContent = 'server';
-        srv.setAttribute('aria-label', 'Server (under construction)');
-        const srvPop = document.createElement('div');
-        srvPop.id = 'server-popup';
-        srvPop.textContent = 'under construction';
-        srv.addEventListener('click', () => {
-            srvPop.classList.remove('show');
-            void srvPop.offsetWidth; // restart the pop-in animation
-            srvPop.classList.add('show');
-            clearTimeout(this._serverPopTimer);
-            this._serverPopTimer = setTimeout(() => srvPop.classList.remove('show'), 2200);
-        });
-        srvWrap.appendChild(srv);
-        srvWrap.appendChild(srvPop);
-        extra.appendChild(srvWrap);
-
         document.body.appendChild(extra);
         this._hudEls.push(extra);
+
+        // --- Presence-server status, top-left. Not a button — a passive
+        // readout of NetworkManager's live WebSocket connection state. ---
+        const srv = document.createElement('div');
+        srv.id = 'server-status';
+        srv.textContent = 'server: inactive';
+        document.body.appendChild(srv);
+        this._serverStatusEl = srv;
+        this._hudEls.push(srv);
+
+        // --- Rolling 24h unique-visitor chart, top-right under the hearts,
+        // left of the minimap. Polls server/index.js's GET /stats. ---
+        this._buildStatsHud();
 
         // --- Player hearts (top-right, just left of the minimap camera) ---
         // Health now runs in HALF-heart steps (cowboy bullets cost 0.5, the
@@ -1045,11 +1064,115 @@ export default class MainScene extends Phaser.Scene {
 
     destroyHUD() {
         clearTimeout(this._toastTimer);
-        clearTimeout(this._serverPopTimer);
+        clearInterval(this._statsPollTimer);
         this._stopTutorialParticles();
         if (this._hudEls) this._hudEls.forEach(el => el.remove());
         this._hudEls = [];
         document.body.classList.remove('hud-ready', 'touch', 'zombies-on', 'cowboy-on');
+    }
+
+    // Reflects NetworkManager's live WebSocket state — "active" means the
+    // presence server (the EC2 Spot box) is actually up and reachable right now.
+    _setServerStatus(connected) {
+        if (!this._serverStatusEl) return;
+        this._serverStatusEl.textContent = connected ? 'server: active' : 'server: inactive';
+        this._serverStatusEl.classList.toggle('active', connected);
+        this._serverStatusEl.classList.toggle('inactive', !connected);
+    }
+
+    // Rolling 24h unique-visitor chart: white-bordered box, rainbow polyline,
+    // white axes, one point per hour, plus a peak readout and a total-unique
+    // line below. Pulls from server/index.js's GET /stats (hashed IPs,
+    // bucketed by hour — see that file for the privacy/persistence notes).
+    _buildStatsHud() {
+        const wrap = document.createElement('div');
+        wrap.id = 'stats-hud';
+
+        const box = document.createElement('div');
+        box.id = 'stats-chart-box';
+
+        const peak = document.createElement('div');
+        peak.id = 'stats-peak';
+        peak.textContent = 'peak: —';
+        box.appendChild(peak);
+
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.id = 'stats-svg';
+        svg.setAttribute('viewBox', '0 0 200 80');
+        svg.setAttribute('preserveAspectRatio', 'none');
+
+        const defs = document.createElementNS(svgNS, 'defs');
+        const grad = document.createElementNS(svgNS, 'linearGradient');
+        grad.id = 'stats-rainbow';
+        grad.setAttribute('x1', '0');
+        grad.setAttribute('y1', '0');
+        grad.setAttribute('x2', '200');
+        grad.setAttribute('y2', '0');
+        grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+        [['0%', '#ff2d55'], ['16%', '#ff9500'], ['33%', '#ffe500'], ['50%', '#34d158'],
+         ['66%', '#00c7ff'], ['83%', '#5e5ce6'], ['100%', '#ff2dd4']].forEach(([offset, color]) => {
+            const stop = document.createElementNS(svgNS, 'stop');
+            stop.setAttribute('offset', offset);
+            stop.setAttribute('stop-color', color);
+            grad.appendChild(stop);
+        });
+        defs.appendChild(grad);
+        svg.appendChild(defs);
+
+        const yAxis = document.createElementNS(svgNS, 'line');
+        yAxis.setAttribute('class', 'stats-axis');
+        yAxis.setAttribute('x1', '10'); yAxis.setAttribute('y1', '4');
+        yAxis.setAttribute('x2', '10'); yAxis.setAttribute('y2', '70');
+        svg.appendChild(yAxis);
+
+        const xAxis = document.createElementNS(svgNS, 'line');
+        xAxis.setAttribute('class', 'stats-axis');
+        xAxis.setAttribute('x1', '10'); xAxis.setAttribute('y1', '70');
+        xAxis.setAttribute('x2', '196'); xAxis.setAttribute('y2', '70');
+        svg.appendChild(xAxis);
+
+        const line = document.createElementNS(svgNS, 'polyline');
+        line.id = 'stats-line';
+        svg.appendChild(line);
+
+        box.appendChild(svg);
+        wrap.appendChild(box);
+
+        const total = document.createElement('div');
+        total.id = 'stats-total';
+        total.textContent = 'total users (24h): —';
+        wrap.appendChild(total);
+
+        document.body.appendChild(wrap);
+        this._hudEls.push(wrap);
+        this._statsPeakEl = peak;
+        this._statsLineEl = line;
+        this._statsTotalEl = total;
+
+        this._fetchStats();
+        this._statsPollTimer = setInterval(() => this._fetchStats(), 5 * 60 * 1000);
+    }
+
+    _fetchStats() {
+        fetch(STATS_URL).then(r => (r.ok ? r.json() : null)).then(data => {
+            if (data) this._renderStats(data);
+        }).catch(() => {});
+    }
+
+    _renderStats({ hourly, peak, totalUnique24h }) {
+        if (!this._statsLineEl || !Array.isArray(hourly) || hourly.length === 0) return;
+        const maxCount = Math.max(peak, 1); // avoid a divide-by-zero when everything's 0
+        const left = 10, right = 196, top = 6, bottom = 70;
+        const stepX = (right - left) / (hourly.length - 1 || 1);
+        const points = hourly.map((h, i) => {
+            const x = left + i * stepX;
+            const y = bottom - (h.count / maxCount) * (bottom - top);
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        this._statsLineEl.setAttribute('points', points);
+        this._statsPeakEl.textContent = `peak: ${peak}`;
+        this._statsTotalEl.textContent = `total users (24h): ${totalUnique24h}`;
     }
 
     // First-person controls: left/right turn, forward/back walk along the facing
@@ -1216,7 +1339,7 @@ export default class MainScene extends Phaser.Scene {
                 .filter(e => e && e.active);
         }
         const list = this.trees.getChildren().slice();
-        list.push(this.computer, this.computerPreview, this.orb, this.ohsSchool, this.brownSchool);
+        list.push(this.computer, this.computerPreview, this.orb, this.contributeSign, this.ohsSchool, this.brownSchool);
         this.bombs.getChildren().forEach(b => { if (b.active) list.push(b); });
         this.heartPickups.getChildren().forEach(h => { if (h.active) list.push(h); });
         this.zombies.forEach(z => { if (z.active) list.push(z); });
@@ -1231,7 +1354,7 @@ export default class MainScene extends Phaser.Scene {
         if (this.inOhs) {
             return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...foes];
         }
-        return [this.computer, this.orb, this.ohsSchool, this.brownSchool, ...this.trees.getChildren(), ...foes];
+        return [this.computer, this.orb, this.contributeSign, this.ohsSchool, this.brownSchool, ...this.trees.getChildren(), ...foes];
     }
 
     update() {
@@ -2071,6 +2194,7 @@ export default class MainScene extends Phaser.Scene {
             this.trees.getChildren().forEach(t => block(t));
             block(this.computer);
             block(this.orb);
+            block(this.contributeSign);
             block(this.ohsSchool);
             block(this.brownSchool);
         }
@@ -2498,6 +2622,7 @@ export default class MainScene extends Phaser.Scene {
             this.physics.add.collider(c, this.plankGroup),
             this.physics.add.collider(c, this.computer),
             this.physics.add.collider(c, this.orb),
+            this.physics.add.collider(c, this.contributeSign),
             this.physics.add.collider(c, this.ohsSchool),
             this.physics.add.collider(c, this.brownSchool),
             this.physics.add.overlap(this.axe, c, this._axeHitsCowboy, null, this),
@@ -2717,6 +2842,7 @@ export default class MainScene extends Phaser.Scene {
                 if (!overlap) {
                     if (Phaser.Math.Distance.Between(x, y, this.computer.x, this.computer.y) < 350) overlap = true;
                     else if (Phaser.Math.Distance.Between(x, y, this.orb.x, this.orb.y) < 150) overlap = true;
+                    else if (Phaser.Math.Distance.Between(x, y, this.contributeSign.x, this.contributeSign.y) < 160) overlap = true;
                     else if (Phaser.Math.Distance.Between(x, y, this.ohsSchool.x, this.ohsSchool.y) < 340) overlap = true;
                     else if (Phaser.Math.Distance.Between(x, y, this.brownSchool.x, this.brownSchool.y) < 380) overlap = true;
                     else if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 140) overlap = true;
@@ -2773,7 +2899,8 @@ export default class MainScene extends Phaser.Scene {
                 if (spr.chops >= 3) {
                     spr.chops = 0; // so it doesn't instantly reopen on return
                     this.sounds.smash();
-                    this.openSubPage(spr.pageUrl);
+                    if (spr.newTab) window.open(spr.pageUrl, '_blank', 'noopener,noreferrer');
+                    else this.openSubPage(spr.pageUrl);
                 }
             }
         });
@@ -2857,6 +2984,7 @@ export default class MainScene extends Phaser.Scene {
             const { x: cx, y: cy } = spots[i];
             const spr = this.physics.add.staticImage(cx, cy, p.key).setScale(0.12).refreshBody();
             spr.pageUrl = p.url;
+            spr.newTab = !!p.newTab;
             spr.chops = 0;
             this.ohsProjectSprites.push(spr);
 
@@ -2928,6 +3056,7 @@ export default class MainScene extends Phaser.Scene {
         set(this.computer);
         if (this.computerPreview) this.computerPreview.setVisible(on);
         set(this.orb);
+        set(this.contributeSign);
         set(this.ohsSchool);
         set(this.brownSchool);
         if (this._bombOverlap) this._bombOverlap.active = on;
@@ -3002,6 +3131,32 @@ export default class MainScene extends Phaser.Scene {
         this.time.delayedCall(500, () => {
             this.canChop = true;
         }, [], this);
+    }
+
+    // Chop the contribute sign 3x -> new tab to the CONTRIBUTING guide.
+    // GitHub blocks framing, so this can't go through openSubPage's iframe.
+    hitContributeSign(axe, sign) {
+        if (!this.canChop) return;
+        this.canChop = false;
+        this.sounds.chop();
+        this.emitHitParticles(axe.x, axe.y);
+        this.doomView.burstAtWorld(axe.x, axe.y, { colors: this._rainbowFx, count: 16, wz: 40 });
+
+        this.tweens.add({
+            targets: sign,
+            x: { value: sign.x + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            y: { value: sign.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            onComplete: () => {
+                this.contributeSignChops++;
+                if (this.contributeSignChops >= 3) {
+                    this.contributeSignChops = 0;
+                    this.sounds.smash();
+                    window.open('https://github.com/brubru6707/bruno-rodriguez-mendez/blob/main/CONTRIBUTING.md', '_blank', 'noopener,noreferrer');
+                }
+            }
+        });
+
+        this.time.delayedCall(500, () => { this.canChop = true; }, [], this);
     }
 
     hitOrb(axe, orb) {

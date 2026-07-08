@@ -2,17 +2,25 @@
 // Reconnects with backoff, throttles outgoing position updates, and hands the
 // latest peer list to the scene via onState — it owns no Phaser objects itself.
 export default class NetworkManager {
-    constructor(url, { onState } = {}) {
+    constructor(url, { onState, onConnectionChange } = {}) {
         this.url = url;
         this.onState = onState || (() => {});
+        this.onConnectionChange = onConnectionChange || (() => {});
         this.id = null;
         this.num = null;
         this.ws = null;
+        this.connected = false;
         this._destroyed = false;
         this._reconnectDelay = 1000;
         this._lastSendAt = 0;
         this._sendIntervalMs = 100;
         this._connect();
+    }
+
+    _setConnected(connected) {
+        if (this.connected === connected) return;
+        this.connected = connected;
+        this.onConnectionChange(connected);
     }
 
     _connect() {
@@ -23,7 +31,7 @@ export default class NetworkManager {
             this._scheduleReconnect();
             return;
         }
-        this.ws.onopen = () => { this._reconnectDelay = 1000; };
+        this.ws.onopen = () => { this._reconnectDelay = 1000; this._setConnected(true); };
         this.ws.onmessage = (evt) => {
             let msg;
             try { msg = JSON.parse(evt.data); } catch (e) { return; }
@@ -34,7 +42,7 @@ export default class NetworkManager {
                 this.onState(msg.players.filter(p => p.id !== this.id));
             }
         };
-        this.ws.onclose = () => { if (!this._destroyed) this._scheduleReconnect(); };
+        this.ws.onclose = () => { this._setConnected(false); if (!this._destroyed) this._scheduleReconnect(); };
         this.ws.onerror = () => { if (this.ws) this.ws.close(); };
     }
 

@@ -6,6 +6,11 @@ export default class SoundManager {
         this.lastFoot = 0;
         this.footFlip = false;
 
+        // Sound-effect mute (independent of music). Starts muted, same as
+        // music defaulting off — nothing plays until the visitor opts in.
+        this.sfxGain = null;
+        this.sfxMuted = true;
+
         // Background music state
         this.musicWanted = false;   // user toggle intent
         this.musicOn = false;       // actually scheduling notes right now
@@ -38,6 +43,11 @@ export default class SoundManager {
             this.master = this.ctx.createGain();
             this.master.gain.value = 0.5;
             this.master.connect(this.ctx.destination);
+            // Every one-shot SFX (footstep/swing/chop/etc.) routes through this
+            // so muting is one gain flip instead of tracking every voice.
+            this.sfxGain = this.ctx.createGain();
+            this.sfxGain.gain.value = this.sfxMuted ? 0 : 1;
+            this.sfxGain.connect(this.master);
         }
         return this.ctx;
     }
@@ -67,7 +77,7 @@ export default class SoundManager {
 
         src.connect(filter);
         filter.connect(g);
-        g.connect(this.master);
+        g.connect(this.sfxGain);
         src.start(t);
         src.stop(t + duration);
     }
@@ -84,9 +94,17 @@ export default class SoundManager {
         g.gain.setValueAtTime(gain, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + duration);
         osc.connect(g);
-        g.connect(this.master);
+        g.connect(this.sfxGain);
         osc.start(t);
         osc.stop(t + duration);
+    }
+
+    // Mute/unmute one-shot SFX (footsteps, chop, smash, etc.) independent of
+    // music. Returns the new muted state so the UI can reflect it.
+    toggleSfx() {
+        this.sfxMuted = !this.sfxMuted;
+        if (this.sfxGain) this.sfxGain.gain.value = this.sfxMuted ? 0 : 1;
+        return this.sfxMuted;
     }
 
     // Soft alternating thud while walking; self-throttled so it can be called every frame

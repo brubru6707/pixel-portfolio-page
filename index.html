@@ -309,11 +309,41 @@
             color: #6a6a78;
         }
 
-        /* Exit button — clears the visitor choice + reloads. Next to the music btn. */
-        #exit-btn {
+        /* SFX mute toggle — footsteps/chop/smash/etc., independent of music.
+           Sits right after the music button. */
+        #sfx-btn {
             position: fixed;
             bottom: max(24px, env(safe-area-inset-bottom));
             left: 128px;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            z-index: 1500;
+        }
+        body.mode-doom #sfx-btn { display: none; }
+        .sfx-icon {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background: center / contain no-repeat;
+            /* Speaker cone + equalizer bars — distinct from music's curved
+               sound-wave icon, since this mutes chop/footstep/smash SFX, not
+               the chiptune loop. */
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1 6 L4 6 L8 2 L8 14 L4 10 L1 10 Z' fill='%23c6ff33'/><rect x='10' y='6' width='1.4' height='4' fill='%23c6ff33'/><rect x='12.4' y='4' width='1.4' height='8' fill='%23c6ff33'/><rect x='14.8' y='7' width='1.2' height='2' fill='%23c6ff33'/></svg>");
+        }
+        #sfx-btn.off {
+            border-color: #6a6a78;
+            color: #6a6a78;
+        }
+        #sfx-btn.off .sfx-icon {
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1 6 L4 6 L8 2 L8 14 L4 10 L1 10 Z' fill='%23888'/><path d='M10 4 L15 12' stroke='%23ff5555' stroke-width='1.7'/><path d='M15 4 L10 12' stroke='%23ff5555' stroke-width='1.7'/></svg>");
+        }
+
+        /* Exit button — clears the visitor choice + reloads. Next to the SFX btn. */
+        #exit-btn {
+            position: fixed;
+            bottom: max(24px, env(safe-area-inset-bottom));
+            left: 182px;
             height: 44px;
             padding: 0 12px;
             font-size: 12px;
@@ -321,17 +351,17 @@
         }
         body.mode-doom #exit-btn { display: none; }
 
-        /* Zombies toggle + server button — continue the bottom-left row after exit */
+        /* Zombies + cowboy toggles — continue the bottom-left row after exit */
         #extra-btns {
             position: fixed;
             bottom: max(24px, env(safe-area-inset-bottom));
-            left: 210px;
+            left: 264px;
             display: flex;
             gap: 8px;
             z-index: 1500;
         }
         body.mode-doom #extra-btns { display: none; }
-        #zombie-btn, #server-btn {
+        #zombie-btn {
             height: 44px;
             padding: 0 12px;
             font-size: 10px;
@@ -340,41 +370,98 @@
             border-color: #ff5555;
             color: #ff5555;
         }
-        #server-btn-wrap { position: relative; }
-        /* "under construction" bubble that pops up above the server button */
-        #server-popup {
-            position: absolute;
-            bottom: 54px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: none;
-            white-space: nowrap;
-            padding: 10px 12px;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            color: #ffe500;
-            background: #1b1b2f;
-            border: 3px solid #ffe500;
-            box-shadow: 4px 4px 0 #000;
-            pointer-events: none;
-        }
-        #server-popup.show { display: block; animation: serverPopIn 0.18s ease-out; }
-        @keyframes serverPopIn {
-            from { transform: translateX(-50%) translateY(6px); opacity: 0; }
-            to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
-        }
         /* Small screens: the bottom row runs out of width — lift the extra
            buttons one row up, above the ? / music / exit row. */
         @media (max-width: 600px) {
             #extra-btns {
                 left: 20px;
                 bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px));
-                flex-wrap: wrap;          /* zombies? + cowboy? + server */
+                flex-wrap: wrap;          /* zombies? + cowboy? */
                 max-width: calc(100vw - 120px);
             }
         }
         #music-btn.off .music-icon {
             background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1 6 L4 6 L8 2 L8 14 L4 10 L1 10 Z' fill='%23888'/><path d='M10 4 L15 12' stroke='%23ff5555' stroke-width='1.7'/><path d='M15 4 L10 12' stroke='%23ff5555' stroke-width='1.7'/></svg>");
+        }
+
+        /* Presence-server status — top-left, passive readout (not a button) of
+           the live WebSocket connection to the EC2 presence server. */
+        #server-status {
+            position: fixed;
+            top: 24px;
+            left: 20px;
+            z-index: 1500;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 8px 12px;
+            background: #1b1b2f;
+            border: 3px solid #6a6a78;
+            box-shadow: 4px 4px 0 #000;
+            color: #6a6a78;
+            pointer-events: none;
+        }
+        #server-status.active {
+            border-color: #c6ff33;
+            color: #c6ff33;
+        }
+        #server-status.inactive {
+            border-color: #ff5555;
+            color: #ff5555;
+        }
+
+        /* Rolling 24h unique-visitor chart — top-right, under the hearts,
+           left of the minimap. */
+        #stats-hud {
+            position: fixed;
+            top: 66px;
+            right: 186px;
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+            pointer-events: none;
+        }
+        #stats-chart-box {
+            width: 200px;
+            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.55);
+            border: 3px solid #ffffff;
+            box-shadow: 4px 4px 0 #000;
+            padding: 6px 6px 4px;
+        }
+        #stats-peak {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            color: #ffffff;
+            text-align: right;
+            margin-bottom: 2px;
+        }
+        #stats-svg {
+            display: block;
+            width: 100%;
+            height: 80px;
+        }
+        .stats-axis {
+            stroke: #ffffff;
+            stroke-width: 1;
+        }
+        #stats-line {
+            fill: none;
+            stroke: url(#stats-rainbow);
+            stroke-width: 2;
+        }
+        #stats-total {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.55);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: #c6ff33;
+            text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+        }
+        @media (max-width: 600px) {
+            #stats-hud { top: 192px; right: 20px; }
         }
 
         /* ---- Player hearts (top-right, just left of the minimap camera) ---- */
@@ -558,12 +645,16 @@
         body.subpage-open #plank-hud,     body.modal-open #plank-hud,
         body.subpage-open #extra-btns,    body.modal-open #extra-btns,
         body.subpage-open #exit-btn,      body.modal-open #exit-btn,
+        body.subpage-open #server-status, body.modal-open #server-status,
+        body.subpage-open #stats-hud,     body.modal-open #stats-hud,
+        body.subpage-open #sfx-btn,       body.modal-open #sfx-btn,
         body.subpage-open #music-btn,     body.modal-open #music-btn {
             display: none !important;
         }
         /* Keep HUD hidden until the world scene has built it */
         body:not(.hud-ready) #action-btn,
         body:not(.hud-ready) #music-btn,
+        body:not(.hud-ready) #sfx-btn,
         body:not(.hud-ready) #exit-btn,
         body:not(.hud-ready) #extra-btns,
         body:not(.hud-ready) #hearts-hud,
@@ -571,6 +662,8 @@
         body:not(.hud-ready) #zscore-hud,
         body:not(.hud-ready) #cscore-hud,
         body:not(.hud-ready) #plank-hud,
+        body:not(.hud-ready) #server-status,
+        body:not(.hud-ready) #stats-hud,
         body:not(.hud-ready) #help-btn { display: none; }
 
         /* ---- Pixelated controls / tutorial popup ---- */
