@@ -61,9 +61,63 @@ export default class MainScene extends Phaser.Scene {
             { key: 'old-portfolio', label: 'old portfolio' },
             { key: 'cyber-insurance-model', label: 'cyber insurance model' },
         ];
+        // Brown University sub-world — same swap as OHS, different projects.
+        this.brownChops = 0;
+        this.brownProjects = [
+            { key: 'shape-up', label: 'shape up', url: 'https://www.tryshapeup.cc/' },
+            { key: 'bloom', label: 'bloom', url: 'https://www.bloom-pots.com/' },
+            { key: 'chipathon', label: 'chipathon 2026', url: 'https://github.com/brubru6707/hungry-chippos-chipathon-2026' },
+        ];
+        // Which sub-world we're inside ('ohs' | 'brown' | null). `inOhs` stays
+        // as the legacy "inside ANY sub-world" flag used all over the code.
+        this.subWorldId = null;
         this.tutorialShown = false;
         this._doomIntroShown = false;
         this._toastTimer = null;
+
+        // Tool + plank inventory: every 3 chopped trees bank 1 plank. Key 1 =
+        // axe, key 2 = plank (or tap the plank HUD chip on touch). Placed
+        // planks wall zombies off; zombies chew through them over time.
+        this.tool = 'axe';
+        this.planks = 0;
+        this._treesTowardPlank = 0;
+        this._actionWasDown = false;   // edge detector for one-per-press placement
+
+        // Zenith frenzy — every 5 zombie kills: 3s of Terraria-Zenith flying
+        // axes, double speed, gold trail, rainbow flurries, invincibility.
+        this._killsTowardZenith = 0;
+        this._zenithUntil = 0;
+        this._invincibleUntil = 0;
+        this._zenithAxes = [];
+        this._lastGoldTrail = 0;
+        this._lastSlashFx = 0;
+
+        // Cowboy duel — opt-in via the "cowboy?" HUD button. His sprite only
+        // shoots to HIS right, so he stalks the player from the left side.
+        this.cowboyEnabled = false;
+        this.cowboy = null;
+        this.COWBOY_HP = 30;
+        this.cowboyKills = 0;
+        try {
+            const ck = parseInt(localStorage.getItem('cowboyKills'), 10);
+            if (!isNaN(ck)) this.cowboyKills = ck;
+        } catch (e) {}
+
+        // Zombie horde — opt-in via the "zombies?" HUD button. Zombies chase
+        // the player in every world/mode, path-find around obstacles (A* on a
+        // coarse nav grid, Minecraft-mob style), and cost a heart on contact.
+        this.zombiesEnabled = false;
+        this.zombies = [];
+        this.MAX_ZOMBIES = 10;
+        this.NAV_CELL = 50;              // nav-grid cell size in world px
+        this._navGrid = null;            // Uint8Array of blocked cells
+        this._navDirty = true;           // rebuild the grid on next use
+        this._zombieDmgUntil = 0;        // player invulnerability window
+        this.zombieKills = 0;            // persisted across visits, like treesCut
+        try {
+            const zk = parseInt(localStorage.getItem('zombieKills'), 10);
+            if (!isNaN(zk)) this.zombieKills = zk;
+        } catch (e) {}
 
         // Performance monitoring
         this.performanceData = detectDevicePerformance();
@@ -74,6 +128,9 @@ export default class MainScene extends Phaser.Scene {
 
     preload() {
         this.load.spritesheet('me', 'assets/me-sprite.png', { frameWidth: 13, frameHeight: 15 });
+        // Same sheet layout as the player sprite (idle + 4-direction walk).
+        this.load.spritesheet('zombie', 'assets/zombie.png', { frameWidth: 13, frameHeight: 15 });
+        this.load.image('brown-university', 'assets/brown-university.png');
         this.load.image('tree', 'assets/tree.png');
         this.load.spritesheet('axe', 'assets/axe.png', { frameWidth: 12, frameHeight: 15 });
         this.load.spritesheet('computer', 'assets/computer.png', { frameWidth: 30, frameHeight: 26 });
@@ -83,6 +140,13 @@ export default class MainScene extends Phaser.Scene {
         this.load.spritesheet('hidden-bomb', 'assets/hidden-bomb.png', { frameWidth: 27, frameHeight: 15 });
         this.load.spritesheet('explosive', 'assets/explosive.png', { frameWidth: 34, frameHeight: 40 });
         this.load.image('instructions', 'assets/instructions.png');
+        // 5 frames: 0-3 walk, 4 = drawing the gun (he only shoots to his right).
+        this.load.spritesheet('cowboy', 'assets/cowboy.png', { frameWidth: 20, frameHeight: 30 });
+
+        // Brown-world project previews.
+        this.load.image('shape-up', 'assets/subdomains/shape-up.png');
+        this.load.image('bloom', 'assets/subdomains/bloom.png');
+        this.load.image('chipathon', 'assets/other-projects/chipathon.png');
 
         // Image previews (replace the old live iframes) + OHS-world art.
         this.load.image('personal-website', 'assets/subdomains/personal-website.png');
@@ -115,17 +179,14 @@ export default class MainScene extends Phaser.Scene {
         this.player.setCollideWorldBounds(true);
         this.axe = this.physics.add.sprite(0, 0, 'axe', 0).setVisible(false).setScale(5).refreshBody();
         this.axe.body.enable = false; // only active mid-swing, so hidden axe can't chop things
-        // Scatter 20 hidden bombs across the field. Touch one and it blows a
+        // Scatter hidden bombs across the field. Touch one and it blows a
         // heart + launches the player (see triggerExplosion). Kept clear of the
         // player's spawn / the central computer so you don't blow up instantly.
+        // They regenerate once the whole batch has been used up.
         this.bombs = this.physics.add.group();
-        const BOMB_COUNT = 10;
-        for (let i = 0; i < BOMB_COUNT; i++) {
-            const bx = Phaser.Math.Between(150, worldWidth - 150);
-            const by = Phaser.Math.Between(150, worldHeight - 150);
-            if (Phaser.Math.Distance.Between(bx, by, worldWidth / 2, worldHeight / 2) < 350) { i--; continue; }
-            this.bombs.create(bx, by, 'hidden-bomb').setImmovable(true).setScale(3).refreshBody();
-        }
+        this.BOMB_COUNT = 10;
+        this._bombRegenQueued = false;
+        this._spawnBombs();
 
         this.cameras.main.startFollow(this.player);
 
@@ -138,10 +199,17 @@ export default class MainScene extends Phaser.Scene {
             miniMapWidth
         ).setZoom(0.1).startFollow(this.player, true, 0.1, 0.1).setBackgroundColor(0x002244).setBounds(0, 0, worldWidth, worldHeight);
 
+        // Right-click must do NOTHING (it used to lock the axe + walk target):
+        // kill the browser context menu and gate every pointer handler below
+        // to the left button / touch only.
+        this.input.mouse.disableContextMenu();
+        const isPrimary = (pointer) => !pointer || pointer.wasTouch || pointer.button === 0;
+
         // Touch input (registered once — was previously re-registered every frame)
         this.touchTarget = { x: this.player.x, y: this.player.y };
-        this.input.on('pointerdown', this.handleTouchInput, this);
-        this.input.on('pointerdown', () => {
+        this.input.on('pointerdown', (p) => { if (isPrimary(p)) this.handleTouchInput(p); });
+        this.input.on('pointerdown', (p) => {
+            if (!isPrimary(p)) return;
             if (!isLikelyMobileDevice()) return;
             this.mobilePlayerMove = true;
             clearTimeout(this.movementTimer);
@@ -161,6 +229,8 @@ export default class MainScene extends Phaser.Scene {
         const mouseHold = (pointer, held) => {
             // wasTouch is false for a mouse, true for a finger — so this swings
             // on mouse click but leaves touch taps for move / the CHOP button.
+            // Only the LEFT button counts; right/middle clicks are ignored.
+            if (pointer && !pointer.wasTouch && pointer.button !== 0) return;
             if (!pointer || !pointer.wasTouch) this.actionHeld = held;
         };
         this.input.on('pointerdown', (p) => mouseHold(p, true));
@@ -200,6 +270,22 @@ export default class MainScene extends Phaser.Scene {
             frameRate: 5,
             repeat: -1,
         });
+        this.anims.create({
+            key: 'cowboy-walk',
+            frames: this.anims.generateFrameNumbers('cowboy', { start: 0, end: 3 }),
+            frameRate: 8,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'cowboy-idle',
+            frames: [{ key: 'cowboy', frame: 0 }],
+            frameRate: 1
+        });
+        this.anims.create({
+            key: 'cowboy-shoot',
+            frames: [{ key: 'cowboy', frame: 4 }],
+            frameRate: 1
+        });
 
         // play animations
         this.orb.anims.play('aura');
@@ -234,47 +320,21 @@ export default class MainScene extends Phaser.Scene {
         // The OHS high school in the bottom-left. Chop it 3x to enter the OHS world.
         this.ohsSchool = this.physics.add.staticSprite(340, worldHeight - 320, 'ohs-school').setScale(6).refreshBody();
 
-        // Spawn trees without overlap
+        // Brown University in the top-left — hand-drawn, chopping it just gets
+        // you a "still coding this" message for now.
+        this.brownSchool = this.physics.add.staticSprite(360, 280, 'brown-university').setScale(5).refreshBody();
+
+        // Spawn trees without overlap (extracted so the forest can regrow when
+        // the player has chopped every last one).
         this.trees = this.physics.add.staticGroup();
-        for (let i = 0; i < 100; i++) {
-            let x, y;
-            let overlap;
-            do {
-                x = Phaser.Math.Between(0, worldWidth);
-                y = Phaser.Math.Between(0, worldHeight);
-                overlap = false;
-                this.trees.getChildren().forEach(tree => {
-                    if (Phaser.Math.Distance.Between(x, y, tree.x, tree.y) < 80) {
-                        overlap = true;
-                    }
-                });
-            } while (overlap);
-
-            const tree = this.trees.create(x, y, 'tree').setScale(3).refreshBody();
-            tree.chopProgress = 0;
-        }
-
-        // Clear trees that spawned too close to the computer, orb, or OHS school
-        this.trees.getChildren().slice().forEach(tree => {
-            if (Phaser.Math.Distance.Between(tree.x, tree.y, this.computer.x, this.computer.y) < 350) {
-                tree.destroy();
-                return;
-            }
-            if (Phaser.Math.Distance.Between(tree.x, tree.y, this.orb.x, this.orb.y) < 150) {
-                tree.destroy();
-                return;
-            }
-            if (Phaser.Math.Distance.Between(tree.x, tree.y, this.ohsSchool.x, this.ohsSchool.y) < 340) {
-                tree.destroy();
-                return;
-            }
-        });
+        this._spawnTrees();
 
         // Collisions
         this.physics.add.collider(this.player, this.trees);
         this.physics.add.collider(this.player, this.computer);
         this.physics.add.collider(this.player, this.orb);
         this.physics.add.collider(this.player, this.ohsSchool);
+        this.physics.add.collider(this.player, this.brownSchool);
         this._bombOverlap = this.physics.add.overlap(this.player, this.bombs, this.triggerExplosion, null, this);
 
         // Overlap detection instead of collider for axe
@@ -282,6 +342,57 @@ export default class MainScene extends Phaser.Scene {
         this.physics.add.overlap(this.axe, this.computer, this.hitComputer, null, this);
         this.physics.add.overlap(this.axe, this.orb, this.hitOrb, null, this);
         this.physics.add.overlap(this.axe, this.ohsSchool, this.hitOhs, null, this);
+        this.physics.add.overlap(this.axe, this.brownSchool, this.hitBrown, null, this);
+
+        // --- Zombies (opt-in horde) ---
+        createAnimations(this, 'zombie');
+        this.zombieGroup = this.physics.add.group();
+        this.physics.add.collider(this.zombieGroup, this.trees);
+        this.physics.add.collider(this.zombieGroup, this.computer);
+        this.physics.add.collider(this.zombieGroup, this.orb);
+        this.physics.add.collider(this.zombieGroup, this.ohsSchool);
+        this.physics.add.collider(this.zombieGroup, this.brownSchool);
+        this.physics.add.collider(this.zombieGroup, this.zombieGroup);
+        this.physics.add.overlap(this.axe, this.zombieGroup, this.hitZombie, null, this);
+        this.physics.add.overlap(this.player, this.zombieGroup, this._zombieTouchPlayer, null, this);
+        // Zombies can't see the hidden bombs — stepping on one blows them
+        // clean in half (and uses the bomb up).
+        this.physics.add.overlap(this.zombieGroup, this.bombs, this._zombieTripsBomb, null, this);
+        // Keep the horde topped up (max MAX_ZOMBIES on the page at once).
+        this.time.addEvent({
+            delay: 2500,
+            loop: true,
+            callback: () => { if (this.zombiesEnabled) this._spawnZombie(); }
+        });
+
+        // --- Planks (placeable walls) ---
+        this.plankGroup = this.physics.add.staticGroup();
+        this.physics.add.collider(this.player, this.plankGroup);
+        // Zombies pressed against a plank gnaw through it over time.
+        this.physics.add.collider(this.zombieGroup, this.plankGroup, this._zombieBitesPlank, null, this);
+
+        // --- Ranged slash (Hollow-Knight nail-slash projectile) ---
+        // Fired with every swing; 2 hits kill a regular zombie.
+        this.slashGroup = this.physics.add.group();
+        this.physics.add.overlap(this.slashGroup, this.zombieGroup, this._slashHitsZombie, null, this);
+        // Slashes splash against trees + planks instead of flying through.
+        this.physics.add.overlap(this.slashGroup, this.trees, (s) => this._popSlash(s), null, this);
+        this.physics.add.overlap(this.slashGroup, this.plankGroup, (s) => this._popSlash(s), null, this);
+
+        // --- Half-heart pickups (rare) ---
+        this.heartPickups = this.physics.add.group();
+        this.physics.add.overlap(this.player, this.heartPickups, this._collectHeart, null, this);
+        this.time.addEvent({
+            delay: 16000,
+            loop: true,
+            callback: () => this._maybeSpawnHeartPickup()
+        });
+
+        // --- Cowboy bullets (he shoots them; the player eats them) ---
+        this.bulletGroup = this.physics.add.group();
+        this.physics.add.overlap(this.bulletGroup, this.player, this._bulletHitsPlayer, null, this);
+        this.physics.add.overlap(this.bulletGroup, this.trees, (b) => this._popBullet(b), null, this);
+        this.physics.add.overlap(this.bulletGroup, this.plankGroup, (b) => this._popBullet(b), null, this);
 
         // Keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -292,6 +403,9 @@ export default class MainScene extends Phaser.Scene {
             D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
         };
         downF = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+        // 1 = axe, 2 = plank (tool switch).
+        this.keyOne = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
+        this.keyTwo = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
 
         // Show instructions at the center of the screen, scaled to fit small screens
         const instrSource = this.textures.get('instructions').getSourceImage();
@@ -538,7 +652,55 @@ export default class MainScene extends Phaser.Scene {
         this._exitBtn = exit;
         this._hudEls.push(exit);
 
+        // --- "zombies?" toggle + "server" button, continuing the bottom row ---
+        const extra = document.createElement('div');
+        extra.id = 'extra-btns';
+
+        const zom = document.createElement('button');
+        zom.id = 'zombie-btn';
+        zom.className = 'pixel-hud-btn';
+        zom.textContent = 'zombies?';
+        zom.setAttribute('aria-label', 'Toggle zombies');
+        zom.addEventListener('click', () => this.setZombiesEnabled(!this.zombiesEnabled));
+        extra.appendChild(zom);
+        this._zombieBtn = zom;
+
+        const cow = document.createElement('button');
+        cow.id = 'cowboy-btn';
+        cow.className = 'pixel-hud-btn';
+        cow.textContent = 'cowboy?';
+        cow.setAttribute('aria-label', 'Toggle the cowboy duel');
+        cow.addEventListener('click', () => this.setCowboyEnabled(!this.cowboyEnabled));
+        extra.appendChild(cow);
+        this._cowboyBtn = cow;
+
+        const srvWrap = document.createElement('div');
+        srvWrap.id = 'server-btn-wrap';
+        const srv = document.createElement('button');
+        srv.id = 'server-btn';
+        srv.className = 'pixel-hud-btn';
+        srv.textContent = 'server';
+        srv.setAttribute('aria-label', 'Server (under construction)');
+        const srvPop = document.createElement('div');
+        srvPop.id = 'server-popup';
+        srvPop.textContent = 'under construction';
+        srv.addEventListener('click', () => {
+            srvPop.classList.remove('show');
+            void srvPop.offsetWidth; // restart the pop-in animation
+            srvPop.classList.add('show');
+            clearTimeout(this._serverPopTimer);
+            this._serverPopTimer = setTimeout(() => srvPop.classList.remove('show'), 2200);
+        });
+        srvWrap.appendChild(srv);
+        srvWrap.appendChild(srvPop);
+        extra.appendChild(srvWrap);
+
+        document.body.appendChild(extra);
+        this._hudEls.push(extra);
+
         // --- Player hearts (top-right, just left of the minimap camera) ---
+        // Health now runs in HALF-heart steps (cowboy bullets cost 0.5, the
+        // big zombie 1.5, half-heart pickups restore 0.5).
         const hearts = document.createElement('div');
         hearts.id = 'hearts-hud';
         this._hearts = [];
@@ -552,6 +714,25 @@ export default class MainScene extends Phaser.Scene {
         document.body.appendChild(hearts);
         this._heartsHud = hearts;
         this._hudEls.push(hearts);
+
+        // --- Plank tool chip: shows the plank count AND switches tools.
+        // Keyboard: 1 = axe, 2 = plank. Touch: tap the chip to toggle. ---
+        const plank = document.createElement('button');
+        plank.id = 'plank-hud';
+        plank.className = 'pixel-hud-btn';
+        plank.setAttribute('aria-label', 'Switch between axe (1) and plank (2)');
+        const plankIcon = document.createElement('div');
+        plankIcon.className = 'plank-icon';
+        const plankVal = document.createElement('span');
+        plankVal.className = 'plank-val';
+        plankVal.textContent = this.planks;
+        plank.appendChild(plankIcon);
+        plank.appendChild(plankVal);
+        plank.addEventListener('click', () => this.setTool(this.tool === 'plank' ? 'axe' : 'plank'));
+        document.body.appendChild(plank);
+        this._plankHud = plank;
+        this._plankVal = plankVal;
+        this._hudEls.push(plank);
 
         // --- Tree-cut score (persisted in localStorage), left of the hearts ---
         const score = document.createElement('div');
@@ -567,6 +748,34 @@ export default class MainScene extends Phaser.Scene {
         this._scoreHud = score;
         this._scoreVal = scoreVal;
         this._hudEls.push(score);
+
+        // --- Zombie-kill counter (left of the tree score; shown while zombies are on) ---
+        const zscore = document.createElement('div');
+        zscore.id = 'zscore-hud';
+        const zscoreIcon = document.createElement('div');
+        zscoreIcon.className = 'zscore-icon';
+        const zscoreVal = document.createElement('span');
+        zscoreVal.className = 'zscore-val';
+        zscoreVal.textContent = this.zombieKills;
+        zscore.appendChild(zscoreIcon);
+        zscore.appendChild(zscoreVal);
+        document.body.appendChild(zscore);
+        this._zscoreVal = zscoreVal;
+        this._hudEls.push(zscore);
+
+        // --- Cowboy-kill counter (shown while the cowboy duel is on) ---
+        const cscore = document.createElement('div');
+        cscore.id = 'cscore-hud';
+        const cscoreIcon = document.createElement('div');
+        cscoreIcon.className = 'cscore-icon';
+        const cscoreVal = document.createElement('span');
+        cscoreVal.className = 'cscore-val';
+        cscoreVal.textContent = this.cowboyKills;
+        cscore.appendChild(cscoreIcon);
+        cscore.appendChild(cscoreVal);
+        document.body.appendChild(cscore);
+        this._cscoreVal = cscoreVal;
+        this._hudEls.push(cscore);
 
         // --- Tutorial popup + toast ---
         this._buildTutorial();
@@ -718,28 +927,31 @@ export default class MainScene extends Phaser.Scene {
         document.body.appendChild(p);
     }
 
-    // Blow up one heart (the right-most one still alive) when a hidden bomb is
-    // touched: pop-and-shrink animation on the heart + a burst of red pixels.
-    loseHeart() {
+    // Take damage in HEARTS (0.5 steps). Zenith mode makes the player
+    // invincible, so damage silently no-ops while it's running.
+    damage(amount = 1) {
         if (!this._hearts || !this._hearts.length) return;
-        let idx = -1;
-        for (let i = this._hearts.length - 1; i >= 0; i--) {
-            if (!this._hearts[i].classList.contains('lost')) { idx = i; break; }
+        if (this.time.now < this._invincibleUntil) return;
+        if (this.health <= 0) return;
+        const prev = this.health;
+        this.health = Math.max(0, Math.round((this.health - amount) * 2) / 2);
+
+        // Explode every heart that just went from alive to fully empty.
+        for (let i = 0; i < this._hearts.length; i++) {
+            const wasAlive = prev > i;
+            const nowDead = this.health <= i;
+            if (wasAlive && nowDead) {
+                const heart = this._hearts[i];
+                const r = heart.getBoundingClientRect();
+                this._spawnHeartParticles(r.left + r.width / 2, r.top + r.height / 2);
+                heart.classList.add('exploding');
+                setTimeout(() => {
+                    heart.classList.remove('exploding');
+                    this._renderHearts();
+                }, 420);
+            }
         }
-        if (idx === -1) return;                 // already at zero
-        const heart = this._hearts[idx];
-        this.health = Math.max(0, this.health - 1);
-
-        // Red pixel particles bursting from the heart's on-screen position.
-        const r = heart.getBoundingClientRect();
-        this._spawnHeartParticles(r.left + r.width / 2, r.top + r.height / 2);
-
-        // Explode the heart, then leave it as a dim "empty" slot.
-        heart.classList.add('exploding');
-        setTimeout(() => {
-            heart.classList.remove('exploding');
-            heart.classList.add('lost');
-        }, 420);
+        this._renderHearts();
 
         // Out of hearts → the player is dead. Let the final heart pop + the
         // launch play out, then reload the whole site for a fresh start.
@@ -748,9 +960,27 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
+    // Legacy single-heart hit (bombs, regular zombies).
+    loseHeart() { this.damage(1); }
+
+    heal(amount = 0.5) {
+        this.health = Math.min(this.maxHealth, Math.round((this.health + amount) * 2) / 2);
+        this._renderHearts();
+    }
+
+    // Paint the heart row from this.health: full / half / lost per slot.
+    _renderHearts() {
+        if (!this._hearts) return;
+        this._hearts.forEach((h, i) => {
+            if (h.classList.contains('exploding')) return; // let the pop finish
+            h.classList.toggle('lost', this.health <= i);
+            h.classList.toggle('half', this.health > i && this.health < i + 1);
+        });
+    }
+
     refillHearts() {
         this.health = this.maxHealth;
-        this._hearts.forEach(h => h.classList.remove('lost', 'exploding'));
+        this._hearts.forEach(h => h.classList.remove('lost', 'half', 'exploding'));
     }
 
     // Red DOM pixel burst radiating from a screen point (used by loseHeart).
@@ -796,10 +1026,11 @@ export default class MainScene extends Phaser.Scene {
 
     destroyHUD() {
         clearTimeout(this._toastTimer);
+        clearTimeout(this._serverPopTimer);
         this._stopTutorialParticles();
         if (this._hudEls) this._hudEls.forEach(el => el.remove());
         this._hudEls = [];
-        document.body.classList.remove('hud-ready', 'touch');
+        document.body.classList.remove('hud-ready', 'touch', 'zombies-on', 'cowboy-on');
     }
 
     // First-person controls: left/right turn, forward/back walk along the facing
@@ -826,7 +1057,9 @@ export default class MainScene extends Phaser.Scene {
         if (fwd) { vx += Math.cos(this.doomAngle); vy += Math.sin(this.doomAngle); }
         if (back) { vx -= Math.cos(this.doomAngle); vy -= Math.sin(this.doomAngle); }
         const mag = Math.hypot(vx, vy);
-        if (mag > 0) this.player.setVelocity((vx / mag) * s.moveSpeed, (vy / mag) * s.moveSpeed);
+        // Zenith frenzy doubles first-person speed too.
+        const spd = s.moveSpeed * (this.time.now < this._zenithUntil ? 2.2 : 1);
+        if (mag > 0) this.player.setVelocity((vx / mag) * spd, (vy / mag) * spd);
         else this.player.setVelocity(0, 0);
     }
 
@@ -834,6 +1067,7 @@ export default class MainScene extends Phaser.Scene {
     // then paint the raycast view. Replaces the whole top-down update() path.
     updateDoomFrame() {
         if (this.inOhs) this.ohsGhosts.forEach(g => this._wanderGhost(g, this.game.loop.delta));
+        this._updateZombies();
         this.updateDoomMovement();
 
         const speedMag = Math.hypot(this.player.body.velocity.x, this.player.body.velocity.y);
@@ -842,13 +1076,23 @@ export default class MainScene extends Phaser.Scene {
         // Attack: put the (invisible) axe body just ahead of the player so the
         // existing chop/overlap handlers fire on whatever we're facing.
         // Driven by the F key (desktop) or the on-screen ⚔ button (touch).
-        const attacking = downF.isDown || this.actionHeld;
+        // The plank tool places a plank ahead of the player instead.
+        const actionDown = downF.isDown || this.actionHeld;
+        if (this.tool === 'plank' && actionDown && !this._actionWasDown) this._placePlank();
+        this._actionWasDown = actionDown;
+        const attacking = actionDown && this.tool === 'axe';
         if (attacking) {
             const reach = 46;
             this.axe.setPosition(this.player.x + Math.cos(this.doomAngle) * reach, this.player.y + Math.sin(this.doomAngle) * reach);
             this.axe.setVisible(false);
             this.axe.body.enable = true;
             if (!this.axeWasActive) this.sounds.swing();
+            // Ranged nail-slash flies out along the facing direction too.
+            const now = this.time.now;
+            if (!this.axeWasActive || now - this.lastSwingAt > 450) {
+                this.lastSwingAt = now;
+                this._fireSlash(Math.cos(this.doomAngle), Math.sin(this.doomAngle));
+            }
         } else {
             this.axe.body.enable = false;
             this.axe.setPosition(0, 0);
@@ -873,26 +1117,47 @@ export default class MainScene extends Phaser.Scene {
     }
 
     // Billboard list for the current world (3D). Main: trees + computer (+ its
-    // preview) + orb + live bombs. OHS: the project images + exit sign + ghosts.
+    // preview) + orb + live bombs. Sub-worlds: the project images + exit sign
+    // + ghosts. Zombies, planks, slashes, the cowboy + his bullets, heart
+    // pickups and flying Zenith axes billboard in every world.
     _doomEntities() {
+        const extras = [
+            ...this.plankGroup.getChildren(),
+            ...this.slashGroup.getChildren(),
+            ...this.bulletGroup.getChildren(),
+            ...this._zenithAxes,
+        ];
+        if (this.cowboy && this.cowboy.active) extras.push(this.cowboy);
         if (this.inOhs) {
-            return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts].filter(e => e && e.active);
+            return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...this.zombies, ...extras]
+                .filter(e => e && e.active);
         }
         const list = this.trees.getChildren().slice();
-        list.push(this.computer, this.computerPreview, this.orb);
+        list.push(this.computer, this.computerPreview, this.orb, this.ohsSchool, this.brownSchool);
         this.bombs.getChildren().forEach(b => { if (b.active) list.push(b); });
+        this.heartPickups.getChildren().forEach(h => { if (h.active) list.push(h); });
+        this.zombies.forEach(z => { if (z.active) list.push(z); });
+        list.push(...extras);
         return list;
     }
 
     // Things that light up the CHOP button when you're near/facing them.
     _hintTargets() {
+        const foes = [...this.zombies];
+        if (this.cowboy && this.cowboy.active) foes.push(this.cowboy);
         if (this.inOhs) {
-            return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts];
+            return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...foes];
         }
-        return [this.computer, this.orb, this.ohsSchool, ...this.trees.getChildren()];
+        return [this.computer, this.orb, this.ohsSchool, this.brownSchool, ...this.trees.getChildren(), ...foes];
     }
 
     update() {
+        // Tool hotkeys work in every mode: 1 = axe, 2 = plank.
+        if (this.keyOne && Phaser.Input.Keyboard.JustDown(this.keyOne)) this.setTool('axe');
+        if (this.keyTwo && Phaser.Input.Keyboard.JustDown(this.keyTwo)) this.setTool('plank');
+        this._updateZenith();
+        this._updateCowboy();
+
         // DOOM (first-person) mode takes a completely separate render/control
         // path and skips all the top-down logic below.
         if (this.is3D) {
@@ -938,6 +1203,10 @@ export default class MainScene extends Phaser.Scene {
             return;
         }
 
+        // Zombies keep hunting even while the player is knocked back, so run
+        // them before the knockback early-return below.
+        this._updateZombies();
+
         // Bomb knockback: slide with the launch velocity, bleeding it off each
         // frame, and ignore movement input until it dies down.
         if (this.time.now < this._knockbackUntil) {
@@ -948,11 +1217,16 @@ export default class MainScene extends Phaser.Scene {
         // Player Movement — tap-to-move on touch, keys otherwise. Chopping is
         // now the dedicated on-screen ⚔ button, so movement no longer has to
         // guess whether a tap meant "walk" vs "swing".
+        // Zenith frenzy: the player rockets around while it lasts.
+        const zenithOn = this.time.now < this._zenithUntil;
+        const maxSp = zenithOn ? this.maxSpeed * 2.2 : this.maxSpeed;
+        const accel = zenithOn ? this.acceleration * 2.4 : this.acceleration;
+
         if (isLikelyMobileDevice() && this.mobilePlayerMove) {
             const dx = Math.round(this.touchTarget.x - this.player.x);
             const dy = Math.round(this.touchTarget.y - this.player.y);
             const distance = Math.hypot(dx, dy);
-            const speed = this.maxSpeed;
+            const speed = maxSp;
 
             if (distance <= 20) {
                 // Cancel movement early if we reach the destination
@@ -987,14 +1261,14 @@ export default class MainScene extends Phaser.Scene {
         } else {
             // Keyboard Input (Arrow keys or WASD)
             if (this.cursors.left.isDown || this.wasd.A.isDown) {
-                velX -= this.acceleration;
+                velX -= accel;
             } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-                velX += this.acceleration;
+                velX += accel;
             }
             if (this.cursors.up.isDown || this.wasd.W.isDown) {
-                velY -= this.acceleration;
+                velY -= accel;
             } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-                velY += this.acceleration;
+                velY += accel;
             }
 
             // Apply friction if no key is pressed
@@ -1006,8 +1280,8 @@ export default class MainScene extends Phaser.Scene {
             }
 
             // Cap velocity
-            velX = Phaser.Math.Clamp(velX, -this.maxSpeed, this.maxSpeed);
-            velY = Phaser.Math.Clamp(velY, -this.maxSpeed, this.maxSpeed);
+            velX = Phaser.Math.Clamp(velX, -maxSp, maxSp);
+            velY = Phaser.Math.Clamp(velY, -maxSp, maxSp);
 
             // Apply new velocity
             this.player.setVelocity(velX, velY);
@@ -1048,7 +1322,12 @@ export default class MainScene extends Phaser.Scene {
 
         // Axe positioning — swings in all four directions. Activated by the F
         // key (desktop) or the held on-screen ⚔ button (works on any device).
-        const axeActive = downF.isDown || this.actionHeld;
+        // With the plank tool selected the same button PLACES a plank instead
+        // (one per press, not per held frame).
+        const actionDown = downF.isDown || this.actionHeld;
+        if (this.tool === 'plank' && actionDown && !this._actionWasDown) this._placePlank();
+        this._actionWasDown = actionDown;
+        const axeActive = actionDown && this.tool === 'axe';
         if (axeActive) {
             // Whoosh at swing start, then repeat while held. A pixelated slash
             // arc flashes in the air on each swing (Hollow-Knight style).
@@ -1062,8 +1341,8 @@ export default class MainScene extends Phaser.Scene {
             this.axeRotations += this.axeRotations < 0.5 ? this.axeRotations * 1.01 + 0.01 : 0.5;
             const sw = this.axeRotations;
             const off = 10;
-            // flipX is inverted from the raw sprite so the axe HEAD faces left
-            // (the sprite's head points right by default).
+            // The axe HEAD mirrors the player's facing: raw sprite's head points
+            // right, so facing right = no flip, facing left = flipX.
             switch (this.lastDirection) {
                 case 'left':
                     this.axe.setFlipX(true);
@@ -1073,21 +1352,21 @@ export default class MainScene extends Phaser.Scene {
                     this.axe.rotation = -sw;
                     break;
                 case 'up':
-                    this.axe.setFlipX(true);
+                    this.axe.setFlipX(false);
                     this.axe.setFlipY(false);
                     this.axe.setOrigin(0.5, 1);
                     this.axe.setPosition(player.x + Math.sin(sw) * off, player.y - Math.cos(sw) * off - 6);
                     this.axe.rotation = sw;
                     break;
                 case 'down':
-                    this.axe.setFlipX(true);
+                    this.axe.setFlipX(false);
                     this.axe.setFlipY(true);
                     this.axe.setOrigin(0.5, 0);
                     this.axe.setPosition(player.x - Math.sin(sw) * off, player.y + Math.cos(sw) * off + 6);
                     this.axe.rotation = -sw;
                     break;
                 default: // right (and idle)
-                    this.axe.setFlipX(true);
+                    this.axe.setFlipX(false);
                     this.axe.setFlipY(false);
                     this.axe.setOrigin(0.5, 1);
                     this.axe.setPosition(player.x + Math.cos(sw) * off, player.y + Math.sin(sw) * off);
@@ -1140,10 +1419,27 @@ export default class MainScene extends Phaser.Scene {
             onComplete: () => {
                 this.sounds.smash();
                 tree.destroy();
+                this._navDirty = true; // a blocker is gone — zombies can re-path through
                 this.logs += 1;
                 // Persist the running tree-cut total + update the HUD counter.
                 try { localStorage.setItem('treesCut', this.logs); } catch (e) {}
                 if (this._scoreVal) this._scoreVal.textContent = this.logs;
+                // Every 3 trees bank one plank (press 2 to place them).
+                this._treesTowardPlank += 1;
+                if (this._treesTowardPlank >= 3) {
+                    this._treesTowardPlank = 0;
+                    this.planks += 1;
+                    if (this._plankVal) this._plankVal.textContent = this.planks;
+                    if (this.planks === 1) this.showToast('+1 PLANK!\nPress 2 (or tap the plank chip) to place it', 3200);
+                }
+                // Chopped the very last tree? The whole forest regrows.
+                if (this.trees.countActive(true) === 0) {
+                    this.time.delayedCall(900, () => {
+                        this._spawnTrees();
+                        this._navDirty = true;
+                        this.showToast('THE FOREST REGROWS...', 2600);
+                    });
+                }
                 // It breaks -> woody particle burst + a hype word popup.
                 const word = this.pickCutWord();
                 this.emitBreakParticles(tx, ty);
@@ -1200,6 +1496,36 @@ export default class MainScene extends Phaser.Scene {
             c.fill();
             tex.refresh();
         }
+        // Left HALF of a chunky pixel heart (the rare +0.5 health pickup).
+        if (!this.textures.exists('halfHeartPix')) {
+            const px = 4; // 4 screen px per "pixel"
+            const tex = this.textures.createCanvas('halfHeartPix', 7 * px, 7 * px);
+            const c = tex.getContext();
+            const rows = [
+                [1, 2],                // y0
+                [0, 1, 2, 3],          // y1
+                [0, 1, 2, 3],          // y2
+                [0, 1, 2, 3],          // y3
+                [1, 2, 3],             // y4
+                [2, 3],                // y5
+                [3]                    // y6
+            ];
+            c.fillStyle = '#ff3b3b';
+            rows.forEach((cols, y) => cols.forEach(x => c.fillRect(x * px, y * px, px, px)));
+            c.fillStyle = '#ffd0d0';   // little shine
+            c.fillRect(1 * px, 1 * px, px, px);
+            tex.refresh();
+        }
+        // The cowboy's bullet: a short orange bolt.
+        if (!this.textures.exists('fxBullet')) {
+            const g = this.make.graphics({ x: 0, y: 0, add: false });
+            g.fillStyle(0xff9500, 1);
+            g.fillRect(0, 1, 12, 4);
+            g.fillStyle(0xffe500, 1);
+            g.fillRect(8, 1, 4, 4);
+            g.generateTexture('fxBullet', 12, 6);
+            g.destroy();
+        }
     }
 
     // Reliable pixel burst built from image sprites (Phaser 3.70's particle
@@ -1243,6 +1569,10 @@ export default class MainScene extends Phaser.Scene {
             none: { rot: 0, dx: off, dy: 0 }
         };
         const m = map[dir] || map.right;
+        // The slash is also the RANGED attack: launch a flying arc that
+        // damages zombies/the cowboy (2 slash hits kill a regular zombie).
+        const mag = Math.hypot(m.dx, m.dy) || 1;
+        this._fireSlash(m.dx / mag, m.dy / mag);
         // A soft cyan under-glow + a bright white core, both sweeping through
         // the arc — reads as a crisp nail-slash flash.
         const glow = this.add.image(this.player.x + m.dx, this.player.y + m.dy, 'fxSlash')
@@ -1370,6 +1700,979 @@ export default class MainScene extends Phaser.Scene {
         this.time.delayedCall(500, () => { this.canChop = true; }, [], this);
     }
 
+    // Chop Brown University 3x -> enter the Brown world (shape up / bloom /
+    // chipathon), the same in-place swap as the OHS world.
+    hitBrown(axe, school) {
+        if (!this.canChop) return;
+        this.canChop = false;
+        this.sounds.chop();
+        this.emitHitParticles(axe.x, axe.y);
+        this.doomView.burstAtWorld(axe.x, axe.y, { colors: this._rainbowFx, count: 16, wz: 40 });
+        this.tweens.add({
+            targets: school,
+            x: { value: school.x + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            y: { value: school.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
+            onComplete: () => {
+                this.brownChops++;
+                if (this.brownChops >= 3) { this.sounds.smash(); this.enterBrownWorld(); }
+            }
+        });
+        this.time.delayedCall(500, () => { this.canChop = true; }, [], this);
+    }
+
+    // ===== Zombies =====
+    // Opt-in horde toggled by the "zombies?" HUD button. They exist in BOTH
+    // worlds and both view modes: plain physics sprites in the top-down sim
+    // (so DOOM mode billboards them for free), path-finding around obstacles.
+
+    setZombiesEnabled(on) {
+        this.zombiesEnabled = on;
+        document.body.classList.toggle('zombies-on', on);
+        if (this._zombieBtn) this._zombieBtn.classList.toggle('on', on);
+        if (on) {
+            this._navDirty = true;
+            for (let i = 0; i < 3; i++) this._spawnZombie();
+            this.showToast('ZOMBIES ENABLED...\nRUN.', 2600);
+        } else {
+            this.zombies.forEach(z => z.destroy());
+            this.zombies = [];
+        }
+    }
+
+    _spawnZombie() {
+        if (!this.zombiesEnabled || this.zombies.length >= this.MAX_ZOMBIES) return;
+        if (this._navDirty) this._buildNavGrid();
+        let x = 0, y = 0, tries = 0, ok = false;
+        while (tries++ < 50 && !ok) {
+            x = Phaser.Math.Between(120, 1880);
+            y = Phaser.Math.Between(120, 1880);
+            ok = Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) > 500
+                && !this._navBlockedAt(x, y);
+        }
+        if (!ok) return;
+        // Once in a while a BIG one lumbers in: 7x the health, 1.5 hearts of
+        // damage on touch, slower but much harder to put down.
+        const big = Math.random() < 0.12;
+        const z = this.zombieGroup.create(x, y, 'zombie', 0).setScale(big ? 5.5 : 3);
+        z.setCollideWorldBounds(true);
+        z.setDepth(5);
+        z._path = null;
+        z._nextRepath = 0;
+        z._stunUntil = 0;
+        z._big = big;
+        // Health is in SLASH units: ranged slash = 1, axe chop = 2.
+        // Regular zombie: 2 (two slashes or one chop). Big: 7x that.
+        z._hp = big ? 14 : 2;
+        z._speed = big ? 60 : 85;
+        if (big) z.setTint(0x9adf6a);
+        z.play('down-zombie');
+        this.zombies.push(z);
+        // Rises out of the ground in a puff of sickly green pixels.
+        this._pixelBurst(x, y, {
+            colors: [0x4a9c2d, 0x7be04a, 0x306b1c, 0x9adf6a],
+            count: big ? 30 : 14, minSpeed: 60, maxSpeed: big ? 260 : 190, gravity: 380
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(x, y, { colors: ['#4a9c2d', '#7be04a', '#306b1c'], count: 14 });
+        }
+        if (big) this.showToast('A BIG ZOMBIE EMERGES...', 2200);
+    }
+
+    // Per-frame zombie brain: staggered A* re-paths toward the player, waypoint
+    // following, walk anims, and post-hit stun. Runs in both 2D and DOOM mode.
+    _updateZombies() {
+        if (!this.zombies.length) return;
+        if (this._navDirty) this._buildNavGrid();
+        const now = this.time.now;
+        for (const z of this.zombies) {
+            if (!z.active) continue;
+            if (now < z._stunUntil) {
+                z.setVelocity(z.body.velocity.x * 0.9, z.body.velocity.y * 0.9);
+                continue;
+            }
+            const distToPlayer = Phaser.Math.Distance.Between(z.x, z.y, this.player.x, this.player.y);
+            if (now >= z._nextRepath) {
+                z._path = this._findPath(z.x, z.y, this.player.x, this.player.y);
+                z._nextRepath = now + 450 + Math.random() * 350; // staggered so they don't all path the same frame
+            }
+            // Walk toward the next waypoint; close-in, just head straight at the player.
+            let tx = this.player.x, ty = this.player.y;
+            if (distToPlayer > 90 && z._path && z._path.length) {
+                while (z._path.length && Phaser.Math.Distance.Between(z.x, z.y, z._path[0].x, z._path[0].y) < 30) {
+                    z._path.shift();
+                }
+                if (z._path.length) { tx = z._path[0].x; ty = z._path[0].y; }
+            }
+            const ang = Math.atan2(ty - z.y, tx - z.x);
+            const sp = z._speed || 85; // slower than the player's 200 — escapable, relentless
+            z.setVelocity(Math.cos(ang) * sp, Math.sin(ang) * sp);
+            const vx = z.body.velocity.x, vy = z.body.velocity.y;
+            if (Math.abs(vx) > Math.abs(vy)) z.play(vx > 0 ? 'right-zombie' : 'left-zombie', true);
+            else z.play(vy > 0 ? 'down-zombie' : 'up-zombie', true);
+        }
+    }
+
+    // Chop a zombie: 2 damage (one-shots a regular, chips away at a big one).
+    hitZombie(axe, z) {
+        if (!this.canChop || !z.active) return;
+        this.canChop = false;
+        this.sounds.chop();
+        this._damageZombie(z, 2);
+        this.time.delayedCall(300, () => { this.canChop = true; }, [], this);
+    }
+
+    // Shared zombie damage: flash, hurt-burst, kill when the HP runs out.
+    _damageZombie(z, dmg) {
+        if (!z.active) return;
+        z._hp = (z._hp === undefined ? 2 : z._hp) - dmg;
+        if (z._hp <= 0) {
+            this._killZombie(z);
+            return;
+        }
+        // Still standing: white flash + a small splat so the hit reads.
+        const keepTint = z._big ? 0x9adf6a : 0xffffff;
+        z.setTintFill(0xffffff);
+        this.time.delayedCall(90, () => {
+            if (!z.active) return;
+            if (z._big) z.setTint(keepTint); else z.clearTint();
+        });
+        z._stunUntil = Math.max(z._stunUntil || 0, this.time.now + 160);
+        this._pixelBurst(z.x, z.y, {
+            colors: [0x4a9c2d, 0x7be04a, 0xff3b3b],
+            count: 8, minSpeed: 70, maxSpeed: 200, gravity: 420
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(z.x, z.y, { colors: ['#4a9c2d', '#7be04a', '#ff3b3b'], count: 8 });
+        }
+    }
+
+    // A zombie dies: splatter (or a full split-in-half if a bomb got it),
+    // bump the kill counter, and maybe kick off the Zenith frenzy.
+    _killZombie(z, { split = false } = {}) {
+        if (!z.active) return;
+        const zx = z.x, zy = z.y;
+        const idx = this.zombies.indexOf(z);
+        if (idx >= 0) this.zombies.splice(idx, 1);
+        if (split) this._splitZombie(z);
+        z.destroy();
+        this.sounds.smash();
+        this.zombieKills += 1;
+        try { localStorage.setItem('zombieKills', this.zombieKills); } catch (e) {}
+        if (this._zscoreVal) this._zscoreVal.textContent = this.zombieKills;
+        const word = Phaser.Utils.Array.GetRandom(['BRAINS!', 'SPLAT!', 'REKT!', 'UNDEAD?', 'HEADSHOT!']);
+        this._pixelBurst(zx, zy, {
+            colors: [0x4a9c2d, 0x7be04a, 0x306b1c, 0xff3b3b, 0x8b0000],
+            count: 26, minSpeed: 110, maxSpeed: 320, gravity: 540
+        });
+        this.showCutText(zx, zy - 40, word);
+        this.doomView.burstAtWorld(zx, zy, { colors: ['#4a9c2d', '#7be04a', '#306b1c', '#ff3b3b'], count: 26, wz: 30 });
+        this.doomView.textAtWorld(zx, zy, word);
+
+        // Every 5 kills: ZENITH TIME.
+        this._killsTowardZenith += 1;
+        if (this._killsTowardZenith >= 5) {
+            this._killsTowardZenith = 0;
+            this._startZenith();
+        }
+    }
+
+    // Gory split-in-half: the zombie's top and bottom halves fly apart,
+    // spinning and fading (used when a hidden bomb gets them).
+    _splitZombie(z) {
+        const frameH = 15; // zombie frames are 13x15
+        const mkHalf = (top) => {
+            const img = this.add.image(z.x, z.y, 'zombie', z.frame.name)
+                .setScale(z.scaleX)
+                .setDepth(60)
+                .setFlipX(z.flipX);
+            if (top) img.setCrop(0, 0, 13, Math.ceil(frameH / 2));
+            else img.setCrop(0, Math.ceil(frameH / 2), 13, Math.floor(frameH / 2));
+            if (this.miniMap) this.miniMap.ignore(img);
+            return img;
+        };
+        const topHalf = mkHalf(true);
+        const botHalf = mkHalf(false);
+        this.tweens.add({
+            targets: topHalf,
+            x: z.x - Phaser.Math.Between(40, 90),
+            y: z.y - Phaser.Math.Between(60, 120),
+            rotation: -2.5 - Math.random() * 2,
+            alpha: 0,
+            duration: 750,
+            ease: 'Cubic.easeOut',
+            onComplete: () => topHalf.destroy()
+        });
+        this.tweens.add({
+            targets: botHalf,
+            x: z.x + Phaser.Math.Between(40, 90),
+            y: z.y - Phaser.Math.Between(20, 60),
+            rotation: 2.5 + Math.random() * 2,
+            alpha: 0,
+            duration: 750,
+            ease: 'Cubic.easeOut',
+            onComplete: () => botHalf.destroy()
+        });
+    }
+
+    // Zombies can't see hidden bombs — stepping on one detonates it and
+    // blows them clean in half.
+    _zombieTripsBomb(z, bomb) {
+        if (!z.active || !bomb.active) return;
+        bomb.disableBody(true, true);
+        this.sounds.smash();
+        const explosion = this.add.sprite(bomb.x, bomb.y, 'explosive').setScale(3).setDepth(16000);
+        explosion.play('explode');
+        explosion.on('animationcomplete', () => explosion.destroy());
+        if (this.miniMap) this.miniMap.ignore(explosion);
+        this._pixelBurst(bomb.x, bomb.y, {
+            colors: [0xff2b2b, 0xff9500, 0xffe500, 0x4a9c2d, 0x8b0000],
+            count: 30, minSpeed: 120, maxSpeed: 340, gravity: 500
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(bomb.x, bomb.y, { colors: ['#ff2b2b', '#ff9500', '#ffe500', '#4a9c2d'], count: 30 });
+        }
+        this._killZombie(z, { split: true });
+        this._checkBombRegen();
+    }
+
+    // A zombie caught the player: hearts gone (1 regular, 1.5 for the BIG
+    // one), shove the player away, brief invulnerability so a crowd can't
+    // drain all three hearts in one touch.
+    _zombieTouchPlayer(player, z) {
+        const now = this.time.now;
+        if (now < this._zombieDmgUntil || now < z._stunUntil) return;
+        if (now < this._invincibleUntil) return; // Zenith: untouchable
+        this._zombieDmgUntil = now + 1500;
+        z._stunUntil = now + 900; // the biter pauses to savor the moment
+        z.setVelocity(0, 0);
+        this.sounds.smash();
+        this.damage(z._big ? 1.5 : 1);
+        this.cameras.main.shake(180, 0.012);
+        this._pixelBurst(player.x, player.y, {
+            colors: [0xff2b2b, 0xff5555, 0xff8080, 0xc40000],
+            count: 18, minSpeed: 90, maxSpeed: 260, gravity: 420
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(player.x, player.y, { colors: ['#ff2b2b', '#ff5555', '#ff8080'], count: 18 });
+        }
+        const ang = Math.atan2(player.y - z.y, player.x - z.x);
+        player.setVelocity(Math.cos(ang) * 900, Math.sin(ang) * 900);
+        this._knockbackUntil = now + 500;
+    }
+
+    // ---- Nav grid + A* (Minecraft-mob-style pathing around obstacles) ----
+
+    // Coarse occupancy grid over the 2000x2000 world (NAV_CELL px per cell),
+    // rebuilt lazily whenever the obstacle set changes (tree chopped, world
+    // swapped). Blockers are the CURRENT world's static bodies.
+    _buildNavGrid() {
+        const CELL = this.NAV_CELL;
+        const cols = Math.ceil(2000 / CELL);
+        const grid = new Uint8Array(cols * cols);
+        const block = (spr, inflate = 8) => {
+            if (!spr || !spr.active) return;
+            const b = spr.getBounds();
+            const x0 = Math.max(0, Math.floor((b.left - inflate) / CELL));
+            const x1 = Math.min(cols - 1, Math.floor((b.right + inflate) / CELL));
+            const y0 = Math.max(0, Math.floor((b.top - inflate) / CELL));
+            const y1 = Math.min(cols - 1, Math.floor((b.bottom + inflate) / CELL));
+            for (let gy = y0; gy <= y1; gy++) {
+                for (let gx = x0; gx <= x1; gx++) grid[gy * cols + gx] = 1;
+            }
+        };
+        if (this.inOhs) {
+            this.ohsProjectSprites.forEach(s => block(s));
+            block(this.ohsExitSign);
+        } else {
+            this.trees.getChildren().forEach(t => block(t));
+            block(this.computer);
+            block(this.orb);
+            block(this.ohsSchool);
+            block(this.brownSchool);
+        }
+        // Player-placed planks wall off paths in every world.
+        this.plankGroup.getChildren().forEach(p => block(p));
+        this._navGrid = grid;
+        this._navCols = cols;
+        this._navDirty = false;
+    }
+
+    _navBlockedAt(x, y) {
+        if (!this._navGrid) return false;
+        const CELL = this.NAV_CELL, cols = this._navCols;
+        const gx = Phaser.Math.Clamp(Math.floor(x / CELL), 0, cols - 1);
+        const gy = Phaser.Math.Clamp(Math.floor(y / CELL), 0, cols - 1);
+        return !!this._navGrid[gy * cols + gx];
+    }
+
+    // A* over the nav grid: 8-directional with no corner-cutting, octile
+    // heuristic, binary-heap open set. Returns world-space waypoints (cell
+    // centers) or null when unreachable / already in the same cell.
+    _findPath(sx, sy, txw, tyw) {
+        const grid = this._navGrid;
+        if (!grid) return null;
+        const cols = this._navCols, CELL = this.NAV_CELL;
+        const clamp = (v) => Phaser.Math.Clamp(v, 0, cols - 1);
+        const sgx = clamp(Math.floor(sx / CELL)), sgy = clamp(Math.floor(sy / CELL));
+        const tgx = clamp(Math.floor(txw / CELL)), tgy = clamp(Math.floor(tyw / CELL));
+        const start = sgy * cols + sgx, goal = tgy * cols + tgx;
+        if (start === goal) return null;
+
+        const free = (idx) => idx === start || idx === goal || !grid[idx];
+        const gScore = new Float32Array(cols * cols).fill(Infinity);
+        const cameFrom = new Int32Array(cols * cols).fill(-1);
+        const closed = new Uint8Array(cols * cols);
+        gScore[start] = 0;
+
+        // Tiny binary min-heap of [f, idx].
+        const heap = [];
+        const push = (f, idx) => {
+            heap.push([f, idx]);
+            let i = heap.length - 1;
+            while (i > 0) {
+                const p = (i - 1) >> 1;
+                if (heap[p][0] <= heap[i][0]) break;
+                [heap[p], heap[i]] = [heap[i], heap[p]];
+                i = p;
+            }
+        };
+        const pop = () => {
+            const top = heap[0], last = heap.pop();
+            if (heap.length) {
+                heap[0] = last;
+                let i = 0;
+                for (;;) {
+                    const l = 2 * i + 1, r = l + 1;
+                    let m = i;
+                    if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+                    if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+                    if (m === i) break;
+                    [heap[m], heap[i]] = [heap[i], heap[m]];
+                    i = m;
+                }
+            }
+            return top;
+        };
+        const hCost = (idx) => {
+            const dx = Math.abs((idx % cols) - tgx);
+            const dy = Math.abs(Math.floor(idx / cols) - tgy);
+            return Math.max(dx, dy) + 0.41 * Math.min(dx, dy); // octile
+        };
+
+        push(hCost(start), start);
+        let iterations = 0;
+        while (heap.length && iterations++ < 3000) {
+            const [, cur] = pop();
+            if (cur === goal) break;
+            if (closed[cur]) continue;
+            closed[cur] = 1;
+            const cx = cur % cols, cy = Math.floor(cur / cols);
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (!dx && !dy) continue;
+                    const nx = cx + dx, ny = cy + dy;
+                    if (nx < 0 || ny < 0 || nx >= cols || ny >= cols) continue;
+                    const nIdx = ny * cols + nx;
+                    if (!free(nIdx) || closed[nIdx]) continue;
+                    // Diagonals may not cut a blocked corner.
+                    if (dx && dy && (!free(cy * cols + nx) || !free(ny * cols + cx))) continue;
+                    const cost = dx && dy ? 1.41 : 1;
+                    const g = gScore[cur] + cost;
+                    if (g < gScore[nIdx]) {
+                        gScore[nIdx] = g;
+                        cameFrom[nIdx] = cur;
+                        push(g + hCost(nIdx), nIdx);
+                    }
+                }
+            }
+        }
+        if (cameFrom[goal] === -1) return null;
+
+        const path = [];
+        for (let idx = goal; idx !== start; idx = cameFrom[idx]) {
+            path.push({ x: (idx % cols) * CELL + CELL / 2, y: Math.floor(idx / cols) * CELL + CELL / 2 });
+        }
+        path.reverse();
+        return path;
+    }
+
+    // ===== Tools & planks =====
+
+    setTool(tool) {
+        if (this.tool === tool) return;
+        this.tool = tool;
+        if (this._plankHud) this._plankHud.classList.toggle('selected', tool === 'plank');
+        if (this._actionBtn) {
+            const label = this._actionBtn.querySelector('.action-label');
+            if (label) label.textContent = tool === 'plank' ? 'PLANK' : 'CHOP';
+        }
+        this.showToast(tool === 'plank' ? 'PLANK selected (2)\nF / CHOP places a wall' : 'AXE selected (1)', 1600);
+    }
+
+    // Drop a plank wall just ahead of the player (facing direction in 2D,
+    // view direction in DOOM). Zombies path around it — or chew through it.
+    _placePlank() {
+        if (this.planks <= 0) {
+            this.showToast('NO PLANKS!\nChop 3 trees to earn one', 2200);
+            return;
+        }
+        let dx = 1, dy = 0;
+        if (this.is3D) {
+            dx = Math.cos(this.doomAngle); dy = Math.sin(this.doomAngle);
+        } else {
+            const dirs = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1], none: [1, 0] };
+            [dx, dy] = dirs[this.lastDirection] || dirs.right;
+        }
+        const px = Phaser.Math.Clamp(this.player.x + dx * 85, 40, 1960);
+        const py = Phaser.Math.Clamp(this.player.y + dy * 85, 40, 1960);
+        const plank = this.plankGroup.create(px, py, 'plank').setScale(3).refreshBody();
+        plank._hp = 5;             // zombie bites it can absorb
+        plank.setDepth(4);
+        this.planks -= 1;
+        if (this._plankVal) this._plankVal.textContent = this.planks;
+        this._navDirty = true;     // zombies + the cowboy re-path around it
+        this.sounds.chop();
+        this._pixelBurst(px, py, {
+            colors: [0x8b5a2b, 0xa9772f, 0xc9a24a],
+            count: 12, minSpeed: 60, maxSpeed: 180, gravity: 420
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(px, py, { colors: ['#8b5a2b', '#a9772f', '#c9a24a'], count: 12 });
+        }
+    }
+
+    // A zombie pressed against a plank gnaws it down over time (big zombies
+    // chew twice as fast). Five bites and it's splinters.
+    _zombieBitesPlank(z, plank) {
+        const now = this.time.now;
+        if (now < (plank._lastBite || 0) + 600) return;
+        plank._lastBite = now;
+        plank._hp -= z._big ? 2 : 1;
+        this.tweens.add({
+            targets: plank,
+            x: { value: plank.x + Phaser.Math.Between(-3, 3), duration: 40, yoyo: true, repeat: 2 },
+            alpha: { value: 0.55 + (plank._hp / 5) * 0.45, duration: 80 }
+        });
+        this._pixelBurst(plank.x, plank.y, {
+            colors: [0x8b5a2b, 0x6b431d],
+            count: 5, minSpeed: 50, maxSpeed: 150, gravity: 420
+        });
+        if (plank._hp <= 0) {
+            const px = plank.x, py = plank.y;
+            plank.destroy();
+            this._navDirty = true;
+            this.sounds.smash();
+            this._pixelBurst(px, py, {
+                colors: [0x8b5a2b, 0xa9772f, 0xc9a24a, 0x6b431d],
+                count: 18, minSpeed: 90, maxSpeed: 260, gravity: 520
+            });
+            if (this.doomView && this.doomView.active) {
+                this.doomView.burstAtWorld(px, py, { colors: ['#8b5a2b', '#a9772f', '#c9a24a'], count: 18 });
+            }
+        }
+    }
+
+    // ===== Ranged slash (Hollow-Knight style) =====
+
+    // Launch a flying slash arc. 1 damage — two of these kill a regular
+    // zombie; the axe itself does 2.
+    _fireSlash(dx, dy) {
+        const s = this.slashGroup.create(this.player.x + dx * 42, this.player.y + dy * 42, 'fxSlash');
+        s.setScale(0.55).setDepth(15998).setAlpha(0.95).setTint(0x8ff0ff);
+        s.setRotation(Math.atan2(dy, dx));
+        s.body.setSize(46, 46, true);
+        s.setVelocity(dx * 520, dy * 520);
+        if (this.miniMap) this.miniMap.ignore(s);
+        // Ranged, not infinite: fizzles out after ~350px of flight.
+        this.time.delayedCall(650, () => { if (s.active) this._popSlash(s, true); });
+    }
+
+    _slashHitsZombie(s, z) {
+        if (!s.active || !z.active) return;
+        this._popSlash(s);
+        this._damageZombie(z, 1);
+    }
+
+    // The slash dissolves — quietly when it just runs out of range, with a
+    // little cyan sparkle when it actually hit something.
+    _popSlash(s, quiet = false) {
+        if (!s.active) return;
+        const sx = s.x, sy = s.y;
+        s.destroy();
+        if (quiet) return;
+        this._pixelBurst(sx, sy, {
+            colors: [0x8ff0ff, 0xffffff, 0x00c7ff],
+            count: 8, minSpeed: 60, maxSpeed: 180, gravity: 260
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(sx, sy, { colors: ['#8ff0ff', '#ffffff', '#00c7ff'], count: 8 });
+        }
+    }
+
+    // ===== Zenith frenzy (every 5 zombie kills) =====
+
+    // 3 seconds of Terraria-Zenith madness: spinning axes dart at everything
+    // nearby, the player doubles in speed with a golden wake, and nothing can
+    // hurt them until it ends.
+    _startZenith() {
+        const now = this.time.now;
+        this._zenithUntil = now + 3000;
+        this._invincibleUntil = now + 3000;
+        this.showToast('Z E N I T H !!', 1800);
+        this.cameras.main.flash(220, 255, 215, 0);
+        if (this._zenithEvent) this._zenithEvent.remove();
+        this._zenithEvent = this.time.addEvent({
+            delay: 130,
+            repeat: 21,   // ~3s worth of axes
+            callback: () => this._spawnZenithAxe()
+        });
+    }
+
+    // One spinning axe darting from the player to a nearby zombie (or a random
+    // point), wrapped in a rainbow flurry, killing what it lands on.
+    _spawnZenithAxe() {
+        const now = this.time.now;
+        if (now > this._zenithUntil) return;
+        let tx, ty, targetZ = null;
+        const near = this.zombies.filter(z => z.active && Phaser.Math.Distance.Between(z.x, z.y, this.player.x, this.player.y) < 520);
+        if (near.length && Math.random() < 0.8) {
+            targetZ = Phaser.Utils.Array.GetRandom(near);
+            tx = targetZ.x; ty = targetZ.y;
+        } else {
+            const a = Math.random() * Math.PI * 2;
+            const d = 130 + Math.random() * 220;
+            tx = this.player.x + Math.cos(a) * d;
+            ty = this.player.y + Math.sin(a) * d;
+        }
+        const axe = this.add.image(this.player.x, this.player.y, 'axe', 0)
+            .setScale(4.5).setDepth(15900);
+        if (this.miniMap) this.miniMap.ignore(axe);
+        this._zenithAxes.push(axe);
+        const rainbow = [0xff2d55, 0xff9500, 0xffe500, 0x34d158, 0x00c7ff, 0x5e5ce6, 0xff2dd4];
+        let lastFx = 0;
+        this.tweens.add({
+            targets: axe,
+            x: tx, y: ty,
+            rotation: Math.PI * 3 * (Math.random() < 0.5 ? 1 : -1),
+            duration: 240,
+            ease: 'Quad.easeOut',
+            onUpdate: () => {
+                // Rainbow flurry streaming off the axe as it flies.
+                const t = performance.now();
+                if (t - lastFx < 28) return;
+                lastFx = t;
+                const p = this.add.image(axe.x, axe.y, 'fxSpark')
+                    .setTint(Phaser.Utils.Array.GetRandom(rainbow))
+                    .setScale(1.6 + Math.random() * 1.8)
+                    .setDepth(15899);
+                if (this.miniMap) this.miniMap.ignore(p);
+                this.tweens.add({ targets: p, alpha: 0, scale: 0.3, duration: 380, onComplete: () => p.destroy() });
+            },
+            onComplete: () => {
+                // Smash whatever is standing at the landing spot.
+                for (const z of this.zombies.slice()) {
+                    if (z.active && Phaser.Math.Distance.Between(z.x, z.y, axe.x, axe.y) < 80) {
+                        this._damageZombie(z, 2);
+                    }
+                }
+                if (this.cowboy && this.cowboy.active
+                    && Phaser.Math.Distance.Between(this.cowboy.x, this.cowboy.y, axe.x, axe.y) < 80) {
+                    this._damageCowboy(2);
+                }
+                this._pixelBurst(axe.x, axe.y, {
+                    colors: rainbow, count: 12, minSpeed: 80, maxSpeed: 240, gravity: 300
+                });
+                if (this.doomView && this.doomView.active) {
+                    this.doomView.burstAtWorld(axe.x, axe.y, { colors: ['#ff2d55', '#ff9500', '#ffe500', '#34d158', '#00c7ff', '#5e5ce6', '#ff2dd4'], count: 12 });
+                }
+                const idx = this._zenithAxes.indexOf(axe);
+                if (idx >= 0) this._zenithAxes.splice(idx, 1);
+                this.tweens.add({ targets: axe, alpha: 0, scale: 1, duration: 140, onComplete: () => axe.destroy() });
+            }
+        });
+    }
+
+    // Per-frame Zenith upkeep: golden flicker on the player + the gold wake
+    // trailing behind them while they move. Runs in 2D and DOOM.
+    _updateZenith() {
+        const now = this.time.now;
+        if (now >= this._zenithUntil) {
+            if (this._zenithTinted) { this._zenithTinted = false; this.player.clearTint(); }
+            return;
+        }
+        this._zenithTinted = true;
+        this.player.setTint((Math.floor(now / 90) % 2) ? 0xffd700 : 0xfff1a8);
+        const speed = this.player.body ? Math.hypot(this.player.body.velocity.x, this.player.body.velocity.y) : 0;
+        if (speed > 40 && now - this._lastGoldTrail > 35) {
+            this._lastGoldTrail = now;
+            for (let i = 0; i < 2; i++) {
+                const p = this.add.image(
+                    this.player.x + Phaser.Math.Between(-14, 14),
+                    this.player.y + Phaser.Math.Between(-4, 18),
+                    'fxSpark'
+                ).setTint(Phaser.Utils.Array.GetRandom([0xffd700, 0xffc400, 0xfff1a8]))
+                 .setScale(2 + Math.random() * 1.6)
+                 .setDepth(4)
+                 .setAlpha(0.95);
+                if (this.miniMap) this.miniMap.ignore(p);
+                this.tweens.add({ targets: p, alpha: 0, scale: 0.4, duration: 480, onComplete: () => p.destroy() });
+            }
+            if (this.doomView && this.doomView.active && now - (this._lastGoldDoom || 0) > 150) {
+                this._lastGoldDoom = now;
+                this.doomView.burstAtWorld(this.player.x, this.player.y, { colors: ['#ffd700', '#ffc400', '#fff1a8'], count: 6, wz: 10 });
+            }
+        }
+    }
+
+    // ===== Half-heart pickups =====
+
+    // Rarely drop a lone half-heart somewhere in the main world (at most 2
+    // out at once, coin-flip per 16s tick — so roughly one every ~30s).
+    _maybeSpawnHeartPickup() {
+        if (this.inOhs) return;
+        if (this.heartPickups.countActive(true) >= 2) return;
+        if (Math.random() < 0.5) return;
+        let x = 0, y = 0, tries = 0, ok = false;
+        while (tries++ < 40 && !ok) {
+            x = Phaser.Math.Between(150, 1850);
+            y = Phaser.Math.Between(150, 1850);
+            if (this._navDirty) this._buildNavGrid();
+            ok = !this._navBlockedAt(x, y)
+                && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) > 300;
+        }
+        if (!ok) return;
+        const h = this.heartPickups.create(x, y, 'halfHeartPix');
+        h.setScale(2).setDepth(4);
+        h.body.setAllowGravity(false);
+        h.setImmovable(true);
+        h.body.moves = false; // let the bob tween own the position
+        // Gentle bob + pulse so it catches the eye.
+        this.tweens.add({ targets: h, y: y - 8, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.tweens.add({ targets: h, alpha: 0.6, duration: 600, yoyo: true, repeat: -1 });
+    }
+
+    _collectHeart(player, h) {
+        if (!h.active) return;
+        const hx = h.x, hy = h.y;
+        h.destroy();
+        this.heal(0.5);
+        this.sounds.chop();
+        this._pixelBurst(hx, hy, {
+            colors: [0xff3b3b, 0xff8080, 0xffd0d0, 0xffffff],
+            count: 14, minSpeed: 70, maxSpeed: 210, gravity: 260
+        });
+        this.showCutText(hx, hy - 30, '+ HALF HEART');
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(hx, hy, { colors: ['#ff3b3b', '#ff8080', '#ffd0d0'], count: 14 });
+            this.doomView.textAtWorld(hx, hy, '+ HALF HEART');
+        }
+    }
+
+    // ===== The Cowboy =====
+    // Opt-in duel via the "cowboy?" HUD button. His art only shoots to HIS
+    // right, so he shadows the player from the LEFT, matching their Y, and
+    // snaps off fast bullets when he has the line. He paths around trees,
+    // but walks straight over hidden bombs — and pays for it.
+
+    setCowboyEnabled(on) {
+        this.cowboyEnabled = on;
+        document.body.classList.toggle('cowboy-on', on);
+        if (this._cowboyBtn) this._cowboyBtn.classList.toggle('on', on);
+        if (on) {
+            this.showToast('A COWBOY RIDES IN\nFROM THE WEST...', 2600);
+            if (!this.cowboy) this._spawnCowboy();
+        } else {
+            if (this._cowboyRespawn) { this._cowboyRespawn.remove(); this._cowboyRespawn = null; }
+            this._despawnCowboy();
+            this.bulletGroup.clear(true, true);
+        }
+    }
+
+    _despawnCowboy() {
+        if (this._cowboyColliders) {
+            this._cowboyColliders.forEach(c => c && c.destroy && c.destroy());
+            this._cowboyColliders = null;
+        }
+        if (this.cowboy) { this.cowboy.destroy(); this.cowboy = null; }
+    }
+
+    _spawnCowboy() {
+        if (this.cowboy) return;
+        const x = 120;
+        const y = Phaser.Math.Clamp(this.player.y, 120, 1880);
+        const c = this.physics.add.sprite(x, y, 'cowboy', 0).setScale(3);
+        c.setCollideWorldBounds(true);
+        c.setDepth(5);
+        c._hp = this.COWBOY_HP;
+        c._path = null;
+        c._nextRepath = 0;
+        c._nextShot = this.time.now + 2500;
+        c._shootingUntil = 0;
+        this.cowboy = c;
+        this._cowboyColliders = [
+            this.physics.add.collider(c, this.trees),
+            this.physics.add.collider(c, this.plankGroup),
+            this.physics.add.collider(c, this.computer),
+            this.physics.add.collider(c, this.orb),
+            this.physics.add.collider(c, this.ohsSchool),
+            this.physics.add.collider(c, this.brownSchool),
+            this.physics.add.overlap(this.axe, c, this._axeHitsCowboy, null, this),
+            this.physics.add.overlap(this.slashGroup, c, this._slashHitsCowboy, null, this),
+            this.physics.add.overlap(c, this.bombs, this._cowboyTripsBomb, null, this),
+        ];
+        this._pixelBurst(x, y, {
+            colors: [0xc9a24a, 0x8b5a2b, 0xe0e0e0],
+            count: 18, minSpeed: 70, maxSpeed: 220, gravity: 420
+        });
+    }
+
+    // Per-frame cowboy brain + bullet housekeeping (runs in 2D and DOOM).
+    _updateCowboy() {
+        const now = this.time.now;
+
+        // Bullet trails: a flurry of orange pixels streaming off each bullet.
+        this.bulletGroup.getChildren().forEach(b => {
+            if (!b.active) return;
+            if (now > (b._dieAt || 0)) { this._popBullet(b); return; }
+            if (now - (b._lastTrail || 0) > 30) {
+                b._lastTrail = now;
+                for (let i = 0; i < 2; i++) {
+                    const p = this.add.image(
+                        b.x - 10 + Phaser.Math.Between(-6, 2),
+                        b.y + Phaser.Math.Between(-5, 5),
+                        'fxSpark'
+                    ).setTint(Phaser.Utils.Array.GetRandom([0xff9500, 0xffb340, 0xff6a00, 0xffe500]))
+                     .setScale(1.4 + Math.random() * 1.4)
+                     .setDepth(5);
+                    if (this.miniMap) this.miniMap.ignore(p);
+                    this.tweens.add({ targets: p, alpha: 0, scale: 0.3, duration: 300, onComplete: () => p.destroy() });
+                }
+            }
+        });
+
+        const c = this.cowboy;
+        if (!c || !c.active) return;
+
+        // Mid quick-draw: stand still and look menacing.
+        if (now < c._shootingUntil) {
+            c.setVelocity(0, 0);
+            c.anims.play('cowboy-shoot', true);
+            return;
+        }
+
+        // Hold a firing position west of the player, matched on Y.
+        const tx = Phaser.Math.Clamp(this.player.x - 380, 80, 1920);
+        const ty = Phaser.Math.Clamp(this.player.y, 80, 1920);
+        const dist = Phaser.Math.Distance.Between(c.x, c.y, tx, ty);
+        if (dist > 40) {
+            if (this._navDirty) this._buildNavGrid();
+            if (now >= c._nextRepath) {
+                c._path = this._findPath(c.x, c.y, tx, ty);
+                c._nextRepath = now + 650 + Math.random() * 300;
+            }
+            let wx = tx, wy = ty;
+            if (c._path && c._path.length) {
+                while (c._path.length && Phaser.Math.Distance.Between(c.x, c.y, c._path[0].x, c._path[0].y) < 30) {
+                    c._path.shift();
+                }
+                if (c._path.length) { wx = c._path[0].x; wy = c._path[0].y; }
+            }
+            const ang = Math.atan2(wy - c.y, wx - c.x);
+            const sp = 130;
+            c.setVelocity(Math.cos(ang) * sp, Math.sin(ang) * sp);
+            c.setFlipX(c.body.velocity.x < -10);
+            c.anims.play('cowboy-walk', true);
+        } else {
+            c.setVelocity(0, 0);
+            c.setFlipX(false);   // face the player (he's east of us)
+            c.anims.play('cowboy-idle', true);
+        }
+
+        // Take the shot when the player is off to his right and roughly level.
+        if (now >= c._nextShot
+            && this.player.x > c.x + 80
+            && Math.abs(this.player.y - c.y) < 70) {
+            this._cowboyShoot();
+            c._nextShot = now + 2400 + Math.random() * 2200;
+        }
+    }
+
+    _cowboyShoot() {
+        const c = this.cowboy;
+        if (!c || !c.active) return;
+        c._shootingUntil = this.time.now + 420;
+        c.setFlipX(false);
+        c.anims.play('cowboy-shoot', true);
+        this.sounds.whoosh();
+        const b = this.bulletGroup.create(c.x + 34, c.y + 4, 'fxBullet');
+        b.setDepth(6);
+        b.body.setAllowGravity(false);
+        b.setVelocity(760, 0);
+        b._dieAt = this.time.now + 2200;
+        if (this.miniMap) this.miniMap.ignore(b);
+        // Muzzle flash.
+        this._pixelBurst(c.x + 36, c.y + 4, {
+            colors: [0xffe500, 0xff9500, 0xffffff],
+            count: 8, minSpeed: 60, maxSpeed: 180, gravity: 200
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(c.x + 36, c.y, { colors: ['#ffe500', '#ff9500'], count: 8 });
+        }
+    }
+
+    _bulletHitsPlayer(b, player) {
+        if (!b.active) return;
+        this._popBullet(b);
+        if (this.time.now < this._invincibleUntil) return;
+        this.sounds.smash();
+        this.damage(0.5);
+        this.cameras.main.shake(120, 0.008);
+        this._pixelBurst(this.player.x, this.player.y, {
+            colors: [0xff2b2b, 0xff9500, 0xff5555],
+            count: 12, minSpeed: 80, maxSpeed: 220, gravity: 380
+        });
+    }
+
+    _popBullet(b) {
+        if (!b.active) return;
+        const bx = b.x, by = b.y;
+        b.destroy();
+        this._pixelBurst(bx, by, {
+            colors: [0xff9500, 0xffb340, 0xffe500],
+            count: 6, minSpeed: 50, maxSpeed: 160, gravity: 300
+        });
+    }
+
+    _axeHitsCowboy(axe, c) {
+        if (!this.canChop || !c.active) return;
+        this.canChop = false;
+        this.sounds.chop();
+        this._damageCowboy(2);
+        this.time.delayedCall(300, () => { this.canChop = true; }, [], this);
+    }
+
+    _slashHitsCowboy(s, c) {
+        if (!s.active || !c.active) return;
+        this._popSlash(s);
+        this._damageCowboy(1);
+    }
+
+    // He walks right over hidden bombs — and they hurt him badly.
+    _cowboyTripsBomb(c, bomb) {
+        if (!c.active || !bomb.active) return;
+        bomb.disableBody(true, true);
+        this.sounds.smash();
+        const explosion = this.add.sprite(bomb.x, bomb.y, 'explosive').setScale(3).setDepth(16000);
+        explosion.play('explode');
+        explosion.on('animationcomplete', () => explosion.destroy());
+        if (this.miniMap) this.miniMap.ignore(explosion);
+        this._pixelBurst(bomb.x, bomb.y, {
+            colors: [0xff2b2b, 0xff9500, 0xffe500, 0xffffff],
+            count: 26, minSpeed: 120, maxSpeed: 340, gravity: 500
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(bomb.x, bomb.y, { colors: ['#ff2b2b', '#ff9500', '#ffe500'], count: 26 });
+        }
+        this._damageCowboy(10);
+        this._checkBombRegen();
+    }
+
+    _damageCowboy(dmg) {
+        const c = this.cowboy;
+        if (!c || !c.active) return;
+        c._hp -= dmg;
+        c.setTintFill(0xffffff);
+        this.time.delayedCall(90, () => { if (c.active) c.clearTint(); });
+        this._pixelBurst(c.x, c.y, {
+            colors: [0xff3b3b, 0xc9a24a, 0x8b5a2b],
+            count: 8, minSpeed: 70, maxSpeed: 200, gravity: 420
+        });
+        if (c._hp <= 0) this._killCowboy();
+    }
+
+    _killCowboy() {
+        const c = this.cowboy;
+        if (!c) return;
+        const cx = c.x, cy = c.y;
+        this._despawnCowboy();
+        this.sounds.smash();
+        this.cowboyKills += 1;
+        try { localStorage.setItem('cowboyKills', this.cowboyKills); } catch (e) {}
+        if (this._cscoreVal) this._cscoreVal.textContent = this.cowboyKills;
+        this._pixelBurst(cx, cy, {
+            colors: [0xc9a24a, 0x8b5a2b, 0xff3b3b, 0xe0e0e0, 0x2d6b1c],
+            count: 30, minSpeed: 110, maxSpeed: 320, gravity: 520
+        });
+        this.showCutText(cx, cy - 40, 'GOT \'EM!');
+        this.doomView.burstAtWorld(cx, cy, { colors: ['#c9a24a', '#8b5a2b', '#ff3b3b', '#e0e0e0'], count: 30, wz: 30 });
+        this.doomView.textAtWorld(cx, cy, "GOT 'EM!");
+        if (this.cowboyEnabled) {
+            this.showToast('The cowboy is down...\nhe\'ll ride back in 30s', 3000);
+            this._cowboyRespawn = this.time.delayedCall(30000, () => {
+                this._cowboyRespawn = null;
+                if (this.cowboyEnabled) this._spawnCowboy();
+            });
+        }
+    }
+
+    // ===== World spawning / regeneration =====
+
+    // Scatter 100 trees, skipping anything too close to another tree, the
+    // landmarks, or the player (so a regrowing forest can't trap anyone).
+    _spawnTrees() {
+        const worldWidth = 2000, worldHeight = 2000;
+        for (let i = 0; i < 100; i++) {
+            let x, y, overlap, tries = 0;
+            do {
+                x = Phaser.Math.Between(0, worldWidth);
+                y = Phaser.Math.Between(0, worldHeight);
+                overlap = false;
+                this.trees.getChildren().forEach(tree => {
+                    if (Phaser.Math.Distance.Between(x, y, tree.x, tree.y) < 80) overlap = true;
+                });
+                if (!overlap) {
+                    if (Phaser.Math.Distance.Between(x, y, this.computer.x, this.computer.y) < 350) overlap = true;
+                    else if (Phaser.Math.Distance.Between(x, y, this.orb.x, this.orb.y) < 150) overlap = true;
+                    else if (Phaser.Math.Distance.Between(x, y, this.ohsSchool.x, this.ohsSchool.y) < 340) overlap = true;
+                    else if (Phaser.Math.Distance.Between(x, y, this.brownSchool.x, this.brownSchool.y) < 380) overlap = true;
+                    else if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 140) overlap = true;
+                }
+            } while (overlap && tries++ < 60);
+            if (overlap) continue;
+            const tree = this.trees.create(x, y, 'tree').setScale(3).refreshBody();
+            tree.chopProgress = 0;
+        }
+    }
+
+    // Scatter a fresh batch of hidden bombs (used at start + regeneration).
+    _spawnBombs() {
+        const worldWidth = 2000, worldHeight = 2000;
+        for (let i = 0; i < this.BOMB_COUNT; i++) {
+            const bx = Phaser.Math.Between(150, worldWidth - 150);
+            const by = Phaser.Math.Between(150, worldHeight - 150);
+            if (Phaser.Math.Distance.Between(bx, by, worldWidth / 2, worldHeight / 2) < 350) { i--; continue; }
+            if (this.player && Phaser.Math.Distance.Between(bx, by, this.player.x, this.player.y) < 250) { i--; continue; }
+            const b = this.bombs.create(bx, by, 'hidden-bomb').setImmovable(true).setScale(3).refreshBody();
+            if (this.anims.exists('bomb-idle')) b.anims.play('bomb-idle');
+            // Inside a sub-world? Keep the fresh batch hidden until we're back.
+            if (this.inOhs) { b.setVisible(false); b.body.enable = false; }
+        }
+        this._bombRegenQueued = false;
+    }
+
+    // Once every hidden bomb has been used up, bury a fresh batch.
+    _checkBombRegen() {
+        if (this._bombRegenQueued) return;
+        const anyLive = this.bombs.getChildren().some(b => b.active);
+        if (anyLive) return;
+        this._bombRegenQueued = true;
+        this.time.delayedCall(3000, () => {
+            this.bombs.clear(true, true);
+            this._spawnBombs();
+            if (!this.inOhs) this.showToast('...more bombs were buried.', 2200);
+        });
+    }
+
     // Chop a project image 3x -> open its site.
     hitProject(axe, spr) {
         if (!this.canChop) return;
@@ -1386,7 +2689,7 @@ export default class MainScene extends Phaser.Scene {
                 if (spr.chops >= 3) {
                     spr.chops = 0; // so it doesn't instantly reopen on return
                     this.sounds.smash();
-                    this.openSubPage(`https://${spr.subdomain}.bruno-rodriguez-mendez.com`);
+                    this.openSubPage(spr.pageUrl);
                 }
             }
         });
@@ -1424,27 +2727,52 @@ export default class MainScene extends Phaser.Scene {
     }
 
     enterOhsWorld() {
+        this._enterSubWorld('ohs', {
+            projects: this.ohsProjects.map(p => ({
+                key: p.key, label: p.label,
+                url: `https://${p.key}.bruno-rodriguez-mendez.com`
+            })),
+            bg: '#33343a', // dark cement
+            toast: 'Welcome to OHS!\nChop a project to open it — hit the EXIT sign to leave.'
+        });
+    }
+
+    enterBrownWorld() {
+        this._enterSubWorld('brown', {
+            projects: this.brownProjects,
+            bg: '#4e3629', // Brown University brown
+            toast: 'Welcome to BROWN!\nChop a project to open it — hit the EXIT sign to leave.'
+        });
+    }
+
+    // Shared in-place world swap used by the OHS + Brown sub-worlds. (The
+    // `inOhs` flag and the `ohs*` collections mean "current sub-world" now.)
+    _enterSubWorld(id, { projects, bg, toast }) {
         if (this.inOhs) return;
         this.inOhs = true;
+        this.subWorldId = id;
         this.ohsChops = 0;
+        this.brownChops = 0;
         this.resetHeldInput();
 
         this._setMainWorldActive(false);
-        this.cameras.main.setBackgroundColor('#33343a'); // dark cement
-        if (this.doomView) this.doomView.setFloorColor && this.doomView.setFloorColor('#33343a');
+        this.cameras.main.setBackgroundColor(bg);
+        if (this.doomView) this.doomView.setFloorColor && this.doomView.setFloorColor(bg);
 
         const worldW = 2000, worldH = 2000;
         this.player.setPosition(300, worldH / 2);
         this.player.setVelocity(0, 0);
+        this._navDirty = true; // different obstacles in here — zombies re-path
 
-        // 6 projects laid out in 2 columns x 3 rows.
-        const colX = [760, 1240];
-        const rowY = [560, 1000, 1440];
-        this.ohsProjects.forEach((p, i) => {
-            const cx = colX[i % 2];
-            const cy = rowY[Math.floor(i / 2)];
+        // Layout: up to 3 projects sit in one centered row; more (OHS's 6)
+        // fall into the 2-column x 3-row grid.
+        const spots = projects.length <= 3
+            ? projects.map((p, i) => ({ x: 500 + i * 500, y: 1000 }))
+            : projects.map((p, i) => ({ x: [760, 1240][i % 2], y: [560, 1000, 1440][Math.floor(i / 2)] }));
+        projects.forEach((p, i) => {
+            const { x: cx, y: cy } = spots[i];
             const spr = this.physics.add.staticImage(cx, cy, p.key).setScale(0.12).refreshBody();
-            spr.subdomain = p.key;
+            spr.pageUrl = p.url;
             spr.chops = 0;
             this.ohsProjectSprites.push(spr);
 
@@ -1455,6 +2783,7 @@ export default class MainScene extends Phaser.Scene {
             this.ohsLabels.push(label);
 
             this.ohsColliders.push(this.physics.add.collider(this.player, spr));
+            this.ohsColliders.push(this.physics.add.collider(this.zombieGroup, spr));
             this.ohsColliders.push(this.physics.add.overlap(this.axe, spr, this.hitProject, null, this));
         });
 
@@ -1475,12 +2804,14 @@ export default class MainScene extends Phaser.Scene {
             this.ohsColliders.push(this.physics.add.overlap(this.axe, g, this.hitOhsGhost, null, this));
         }
 
-        this.showToast('Welcome to OHS!\nChop a project to open it — hit the EXIT sign to leave.', 4000);
+        this.showToast(toast, 4000);
     }
 
     exitOhsWorld() {
         if (!this.inOhs) return;
+        const cameFrom = this.subWorldId;
         this.inOhs = false;
+        this.subWorldId = null;
         this.resetHeldInput();
 
         this.ohsColliders.forEach(c => c && c.destroy && c.destroy());
@@ -1497,9 +2828,12 @@ export default class MainScene extends Phaser.Scene {
         if (this.doomView) this.doomView.setFloorColor && this.doomView.setFloorColor(null);
         this._setMainWorldActive(true);
         this.ohsChops = 0;
+        this.brownChops = 0;
+        this._navDirty = true; // back to the main world's obstacles
 
-        // Drop the player just to the right of the OHS school.
-        this.player.setPosition(this.ohsSchool.x + 240, this.ohsSchool.y);
+        // Drop the player just to the right of whichever school we entered.
+        const school = cameFrom === 'brown' ? this.brownSchool : this.ohsSchool;
+        this.player.setPosition(school.x + 240, school.y);
         this.player.setVelocity(0, 0);
     }
 
@@ -1511,11 +2845,17 @@ export default class MainScene extends Phaser.Scene {
         if (this.computerPreview) this.computerPreview.setVisible(on);
         set(this.orb);
         set(this.ohsSchool);
+        set(this.brownSchool);
         if (this._bombOverlap) this._bombOverlap.active = on;
         this.bombs.getChildren().forEach(b => {
             // Only re-show bombs that were never triggered (triggered ones stay gone).
             b.setVisible(on && b.active);
             if (b.body) b.body.enable = on && b.active;
+        });
+        // Half-heart pickups only live in the main world.
+        this.heartPickups.getChildren().forEach(h => {
+            h.setVisible(on && h.active);
+            if (h.body) h.body.enable = on && h.active;
         });
     }
 
@@ -1700,6 +3040,8 @@ export default class MainScene extends Phaser.Scene {
     }
 
     triggerExplosion(player, bomb) {
+        // Zenith mode: the player is untouchable — don't even waste the bomb.
+        if (this.time.now < this._invincibleUntil) return;
         bomb.disableBody(true, true); // hide & disable this bomb
         this.sounds.smash();
 

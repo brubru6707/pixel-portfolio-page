@@ -3,9 +3,15 @@
 :root{
     --main: black;
     --fColor: #ECECDA;
-    --subMain1: #296B1C;
-    --subMain2: #882626;
-    --borderRad: 15px; 
+    /* Brightened from the old dark green (#296B1C) / dark red (#882626),
+       which were hard to read against the dark background. */
+    --subMain1: #4ec938;
+    --subMain2: #e05252;
+    /* Translucent versions used by the background triangles so they read as
+       color tints over the background video instead of solid fills. */
+    --subMain1-tint: rgba(78, 201, 56, 0.55);
+    --subMain2-tint: rgba(224, 82, 82, 0.55);
+    --borderRad: 15px;
     --space: 150px;
     --pix: "Jersey 10", sans-serif;
 }
@@ -18,7 +24,7 @@ html.recruiter-view {
 /* The layout is tuned around the pixel font at 1.5em; a normal sans-serif at
    that size overflows the fixed header. Tighten it so the recruiter view reads
    clean and professional. */
-html.recruiter-view body { font-size: 1.05em; line-height: 1.7em; }
+html.recruiter-view body { font-size: 1.15em; line-height: 1.7em; }
 
 /* Exit button shown only on the standalone recruiter view */
 #recruiter-exit {
@@ -72,7 +78,7 @@ header{
 .nav-link {
     color: var(--fColor);
     text-decoration: none;
-    font-size: 0.8em;
+    font-size: 0.9em;
     padding: 8px 15px;
     border-radius: 5px;
     transition: all 0.3s ease;
@@ -102,7 +108,7 @@ body{
     overflow-x: hidden;
     line-height: 2em;
     font-family: var(--pix);
-    font-size: 1.7em;
+    font-size: 1.9em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -130,11 +136,14 @@ body{
     border: 2px solid var(--fColor);
 } */
 
+/* The triangles sit OVER the goop cover as translucent color tints — where a
+   goop drip has punched through to the video, the triangle tints the video
+   green/red; everywhere else the cover is opaque black under them. */
 body::before{
     content: " ";
-    background-color: var(--subMain1);
+    background-color: var(--subMain1-tint);
     position: fixed;
-    z-index: -100;
+    z-index: -98;
     clip-path: polygon(50% 50%, 0 0%, 0 100%);
     height: 100vh;
     width: 100vw;
@@ -145,9 +154,9 @@ body::before{
 
 #background{
     content: " ";
-    background-color: var(--subMain2);
+    background-color: var(--subMain2-tint);
     position: fixed;
-    z-index: -99;
+    z-index: -97;
     left: 150vw;
     clip-path: polygon(100% 0%, 50% 50%, 100% 100%);
     height: 100vh;
@@ -157,12 +166,34 @@ body::before{
     position: fixed;
 }
 
+/* ---- Goop cover ----
+   Opaque black sheet between the video and the triangles. JS punches falling
+   drip-shaped holes through it every frame (destination-out), and the gooey
+   SVG filter below makes nearby holes blur + threshold into one merged blob —
+   the genuine dripping-liquid technique, inverted into a reveal. */
+#goop-cover {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -99;
+    pointer-events: none;
+    filter: url("#goo");
+}
+#goop-defs {
+    position: fixed;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
 footer{
     width: 100vw;
     box-sizing: border-box;
     background-color: black;
     padding: 10px;
-
+    /* keep the © line clear of the fixed "now playing" badge bottom-left */
+    padding-bottom: 70px;
 }
 
 ::selection{
@@ -405,45 +436,68 @@ footer{
     transform: scale(1.05);
 }
 
-/* ---- Splatoon-style rainbow goop dripping from the intro triangles ---- */
-#goop-layer {
+/* ---- Full-page background video ----
+   A muted, autoplaying YouTube video of a random project fills the viewport
+   behind everything, at FULL opacity — but it's hidden behind the opaque
+   #goop-cover above it. Only the gooey falling drips punched through the
+   cover reveal it, and the translucent triangles (body::before / #background)
+   tint whatever the goop reveals inside them. */
+#video-layer {
     position: fixed;
     inset: 0;
-    z-index: -90;
+    z-index: -100;
+    opacity: 0;
     pointer-events: none;
     overflow: hidden;
+    transition: opacity 1.2s ease;
+}
+#video-layer.playing {
+    opacity: 1;
 }
 
-.goop-drip {
-    position: absolute;
-    top: -4vh;
-    height: 0;
-    border-bottom-left-radius: 60% 40px;
-    border-bottom-right-radius: 60% 40px;
-    transform-origin: top center;
-    image-rendering: pixelated;
-    animation: goopDrip 1.8s cubic-bezier(0.25, 0.8, 0.4, 1) forwards;
-    will-change: height, transform;
+/* ---- "Now playing" badge (bottom-left) ----
+   Names the project whose video is currently running behind the page. */
+#now-playing {
+    position: fixed;
+    left: 18px;
+    bottom: 18px;
+    z-index: 1500;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    max-width: 74vw;
+    padding: 8px 16px;
+    font-family: var(--pix);
+    font-size: 0.75em;
+    line-height: 1.4em;
+    color: var(--fColor);
+    background: rgba(0, 0, 0, 0.75);
+    border: 2px solid var(--fColor);
+    border-radius: var(--borderRad);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
-
-.goop-drip::after {
-    /* the fat blob at the leading edge of the drip */
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: -14px;
-    width: 130%;
-    height: 28px;
-    transform: translateX(-50%);
-    background: inherit;
+#now-playing.show { display: flex; }
+#now-playing.pop { animation: nowPlayingPop 0.35s ease; }
+@keyframes nowPlayingPop {
+    0%   { transform: scale(0.85); }
+    60%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+#now-playing-dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
+    background: var(--subMain2);
+    animation: nowPlayingPulse 1.4s ease-in-out infinite;
 }
-
-@keyframes goopDrip {
-    0%   { height: 0; opacity: 0.95; }
-    70%  { opacity: 0.95; }
-    100% { opacity: 0.85; }
+@keyframes nowPlayingPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
 }
+#now-playing-label { opacity: 0.7; }
+#now-playing-name { color: var(--subMain1); }
 
 /* Card Styling */
 .card-container {
@@ -628,11 +682,7 @@ body.modal-open {
         font-size: 1em;
     }
 
-    #escButton-holder {
-        right: 10px;
-    }
-
-    #intro-holder{ 
+    #intro-holder{
         width: 90vw;
         margin-left: 5vw;
     }
@@ -658,42 +708,6 @@ body.is-mobile {
 .space {
     margin-top: var(--space);
     margin-bottom: var(--space);
-}
-
-#escButton-holder {
-    display: flex;
-    align-items: center;
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    z-index: 1001;
-    backdrop-filter: blur(1px);
-    border-radius: 100px;
-    background-color: rgba(0, 0, 0, 0.3); /* Optional dark tint */
-    visibility: hidden; 
-}
-#escButton-text {
-    font-size: 20px;
-    color: white;
-    width: 50%;
-}
-
-#escButton {
-    display: flex;
-    align-items: start;
-    justify-content: end;
-    width: 50%;
-}
-
-#escButton-image {
-    transform: scale(3.7);
-    width: 32px; /* sprite native width */
-    height: 16px; /* sprite native height */
-    background-image: url('/assets/esc-key.png');
-    background-repeat: no-repeat;
-    background-size: contain;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
 }
 
 .social-container {
@@ -723,6 +737,11 @@ body.is-mobile {
   transition: background 0.2s;
 }
 
+/* Bigger footer social-media icons */
+.social-social i {
+  font-size: 44px;
+}
+
 .social-social:hover {
   background: rgba(255, 255, 255, 0.2);
 }
@@ -732,7 +751,7 @@ body.is-mobile {
     margin-bottom: 25px;
     padding: 15px;
     border-left: 3px solid var(--subMain1);
-    background-color: rgba(41, 107, 28, 0.1);
+    background-color: rgba(78, 201, 56, 0.1);
 }
 
 .edu-item strong {

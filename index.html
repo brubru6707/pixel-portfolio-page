@@ -1,15 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Bruno Rodriguez-Mendez Portfolio</title>
+    <title>Bruno Rodriguez-Mendez — Software Engineer Portfolio (Pixel Game)</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="description" content="Bruno Rodriguez-Mendez is a software engineer and Computer & Electrical Engineering student at Brown University. Explore his projects inside an interactive pixel-art game — chop trees, enter 3D mode, and discover full-stack, AI, and hardware work.">
+    <meta name="author" content="Bruno Rodriguez-Mendez">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#1b1b2f">
+    <link rel="canonical" href="https://bruno-rodriguez-mendez.com/">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://brunorodriguezmendez.com/">
-    <meta property="og:title" content="Bruno Rodriguez-Mendez">
-    <meta property="og:author" content="Bruno Rodriguez-Mendez">
-    <meta property="og:description" content="BrownU Software Engineer">
+    <meta property="og:url" content="https://bruno-rodriguez-mendez.com/">
+    <meta property="og:title" content="Bruno Rodriguez-Mendez — Software Engineer Portfolio">
+    <meta property="og:site_name" content="Bruno Rodriguez-Mendez">
+    <meta property="og:description" content="An interactive pixel-art game portfolio: chop your way through Bruno's full-stack, AI, and hardware projects.">
+    <meta property="og:image" content="https://bruno-rodriguez-mendez.com/assets/subdomains/personal-website.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Bruno Rodriguez-Mendez — Software Engineer Portfolio">
+    <meta name="twitter:description" content="An interactive pixel-art game portfolio: chop your way through Bruno's full-stack, AI, and hardware projects.">
+    <meta name="twitter:image" content="https://bruno-rodriguez-mendez.com/assets/subdomains/personal-website.png">
     <link rel="icon" href="/assets/brubru.jpg" type="image/JPG">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Bruno Rodriguez-Mendez",
+      "url": "https://bruno-rodriguez-mendez.com/",
+      "author": {
+        "@type": "Person",
+        "name": "Bruno Rodriguez-Mendez",
+        "url": "https://bruno-rodriguez-mendez.com/",
+        "jobTitle": "Software Engineer",
+        "affiliation": { "@type": "CollegeOrUniversity", "name": "Brown University" },
+        "sameAs": [
+          "https://github.com/brubru6707",
+          "https://www.linkedin.com/in/bruno-rodriguez-mendez-18723725b/"
+        ]
+      }
+    }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -291,6 +320,59 @@
             z-index: 1500;
         }
         body.mode-doom #exit-btn { display: none; }
+
+        /* Zombies toggle + server button — continue the bottom-left row after exit */
+        #extra-btns {
+            position: fixed;
+            bottom: max(24px, env(safe-area-inset-bottom));
+            left: 210px;
+            display: flex;
+            gap: 8px;
+            z-index: 1500;
+        }
+        body.mode-doom #extra-btns { display: none; }
+        #zombie-btn, #server-btn {
+            height: 44px;
+            padding: 0 12px;
+            font-size: 10px;
+        }
+        #zombie-btn.on {
+            border-color: #ff5555;
+            color: #ff5555;
+        }
+        #server-btn-wrap { position: relative; }
+        /* "under construction" bubble that pops up above the server button */
+        #server-popup {
+            position: absolute;
+            bottom: 54px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            white-space: nowrap;
+            padding: 10px 12px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            color: #ffe500;
+            background: #1b1b2f;
+            border: 3px solid #ffe500;
+            box-shadow: 4px 4px 0 #000;
+            pointer-events: none;
+        }
+        #server-popup.show { display: block; animation: serverPopIn 0.18s ease-out; }
+        @keyframes serverPopIn {
+            from { transform: translateX(-50%) translateY(6px); opacity: 0; }
+            to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
+        }
+        /* Small screens: the bottom row runs out of width — lift the extra
+           buttons one row up, above the ? / music / exit row. */
+        @media (max-width: 600px) {
+            #extra-btns {
+                left: 20px;
+                bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px));
+                flex-wrap: wrap;          /* zombies? + cowboy? + server */
+                max-width: calc(100vw - 120px);
+            }
+        }
         #music-btn.off .music-icon {
             background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1 6 L4 6 L8 2 L8 14 L4 10 L1 10 Z' fill='%23888'/><path d='M10 4 L15 12' stroke='%23ff5555' stroke-width='1.7'/><path d='M15 4 L10 12' stroke='%23ff5555' stroke-width='1.7'/></svg>");
         }
@@ -305,6 +387,9 @@
             z-index: 1500;
             pointer-events: none;
         }
+        /* Chunky stepped "pixel-rounded" corners shared by the glass HUD chips
+           (hearts + scores) — replaces the smooth border-radius glass, which
+           clashed with the pixel art it was covering. */
         .heart {
             position: relative;
             width: 34px;
@@ -312,27 +397,30 @@
             image-rendering: pixelated;
             background: center / 74% no-repeat;
             background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'><g fill='%23ff3b3b'><rect x='1' width='2' height='1'/><rect x='4' width='2' height='1'/><rect y='1' width='7' height='3'/><rect x='1' y='4' width='5' height='1'/><rect x='2' y='5' width='3' height='1'/><rect x='3' y='6' width='1' height='1'/></g></svg>");
-            /* Glass backing: translucent rounded pane behind the pixel heart */
-            border-radius: 9px;
-            background-color: rgba(255, 90, 120, 0.14);
-            border: 1px solid rgba(255, 255, 255, 0.35);
-            backdrop-filter: blur(3px);
-            -webkit-backdrop-filter: blur(3px);
-            box-shadow:
-                0 2px 6px rgba(0, 0, 0, 0.45),
-                inset 0 1px 2px rgba(255, 255, 255, 0.55),
-                0 0 10px rgba(255, 59, 59, 0.35);
-            filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.55));
+            /* Pixelated glass backing: still translucent, but hard-edged —
+               stepped corners, no blur, hard offset shadow. */
+            background-color: rgba(255, 90, 120, 0.18);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            clip-path: polygon(0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px));
+            box-sizing: border-box;
+            filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 6px rgba(255, 59, 59, 0.35));
             transition: transform 0.1s;
         }
-        /* Glossy diagonal sheen sweeping across the top of the glass heart */
+        /* Hard-stepped sheen banding across the top of the glass (no smooth
+           gradient — three flat bands, like light on pixel glass). */
         .heart::before {
             content: "";
             position: absolute;
             inset: 0;
-            border-radius: 9px;
             pointer-events: none;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 38%, rgba(255, 255, 255, 0) 60%);
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.5) 22%,
+                rgba(255, 255, 255, 0.18) 22%, rgba(255, 255, 255, 0.18) 44%,
+                rgba(255, 255, 255, 0) 44%);
+        }
+        /* Half heart: left half still red, right half a dim husk */
+        .heart.half {
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'><defs><clipPath id='l'><rect x='0' y='0' width='3.5' height='7'/></clipPath></defs><g fill='%23492030'><rect x='1' width='2' height='1'/><rect x='4' width='2' height='1'/><rect y='1' width='7' height='3'/><rect x='1' y='4' width='5' height='1'/><rect x='2' y='5' width='3' height='1'/><rect x='3' y='6' width='1' height='1'/></g><g fill='%23ff3b3b' clip-path='url(%23l)'><rect x='1' width='2' height='1'/><rect x='4' width='2' height='1'/><rect y='1' width='7' height='3'/><rect x='1' y='4' width='5' height='1'/><rect x='2' y='5' width='3' height='1'/><rect x='3' y='6' width='1' height='1'/></g></svg>");
         }
         /* Empty slot: dim, greyed-out husk left behind after a heart blows */
         .heart.lost {
@@ -361,10 +449,9 @@
         }
 
         /* ---- Tree-cut score (persisted), sits just left of the hearts ---- */
-        #score-hud {
+        #score-hud, #zscore-hud, #cscore-hud {
             position: fixed;
             top: 24px;
-            right: 314px;         /* immediately left of #hearts-hud (right:186px + ~118px wide) */
             height: 34px;
             display: flex;
             align-items: center;
@@ -372,20 +459,92 @@
             padding: 0 10px 0 8px;
             z-index: 1500;
             pointer-events: none;
-            border-radius: 9px;
-            background-color: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.45);
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-sizing: border-box;
+            clip-path: polygon(0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px));
+            filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55));
             font-family: 'Press Start 2P', monospace;
             font-size: 12px;
             color: #c6ff33;
             text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+        }
+        #score-hud {
+            right: 314px;         /* immediately left of #hearts-hud (right:186px + ~118px wide) */
         }
         #score-hud .score-icon {
             width: 22px;
             height: 22px;
             image-rendering: pixelated;
             background: center / contain no-repeat url("assets/tree.png");
+        }
+        /* Zombie-kill counter — appears left of the tree score when zombies are on */
+        #zscore-hud {
+            right: 404px;
+            display: none;
+            color: #7be04a;
+        }
+        body.zombies-on #zscore-hud { display: flex; }
+        #zscore-hud .zscore-icon {
+            width: 22px;
+            height: 22px;
+            image-rendering: pixelated;
+            background: center / contain no-repeat;
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'><g fill='%234a9c2d'><rect width='7' height='7'/></g><g fill='%23306b1c'><rect x='1' y='2' width='2' height='2'/><rect x='4' y='2' width='2' height='2'/><rect x='2' y='5' width='3' height='1'/></g><g fill='%23111'><rect x='1' y='2' width='1' height='1'/><rect x='5' y='2' width='1' height='1'/></g></svg>");
+        }
+
+        /* Cowboy-kill counter — appears left of the zombie score when the duel is on */
+        #cscore-hud {
+            right: 494px;
+            display: none;
+            color: #ffb340;
+        }
+        body.cowboy-on #cscore-hud { display: flex; }
+        #cscore-hud .cscore-icon {
+            width: 22px;
+            height: 26px;
+            image-rendering: pixelated;
+            /* first frame of the 5-frame cowboy sheet */
+            background: left center / auto 100% no-repeat url("assets/cowboy.png");
+        }
+        #cowboy-btn { height: 44px; padding: 0 12px; font-size: 10px; }
+        #cowboy-btn.on {
+            border-color: #ffb340;
+            color: #ffb340;
+        }
+        /* Phones: the top row can't fit 3 counter chips beside the hearts —
+           stack them in a column under the hearts instead. */
+        @media (max-width: 600px) {
+            #score-hud  { right: 186px; top: 66px; }
+            #zscore-hud { right: 186px; top: 108px; }
+            #cscore-hud { right: 186px; top: 150px; }
+        }
+
+        /* Plank tool chip: shows the plank count, doubles as the tool switch
+           (keyboard 1/2 does the same). Sits above the CHOP button. */
+        #plank-hud {
+            position: fixed;
+            bottom: max(184px, calc(env(safe-area-inset-bottom) + 184px));
+            right: 20px;
+            height: 44px;
+            padding: 0 12px 0 8px;
+            gap: 8px;
+            z-index: 1500;
+            font-size: 12px;
+        }
+        #plank-hud .plank-icon {
+            width: 22px;
+            height: 24px;
+            image-rendering: pixelated;
+            background: center / contain no-repeat url("assets/plank.png");
+        }
+        #plank-hud.selected {
+            border-color: #ffb340;
+            color: #ffb340;
+            box-shadow: 4px 4px 0 #000, 0 0 12px rgba(255, 179, 64, 0.6);
+        }
+        @media (max-width: 600px) {
+            #plank-hud { bottom: max(172px, calc(env(safe-area-inset-bottom) + 172px)); }
         }
 
         /* Hide all HUD controls behind an open sub-page or modal */
@@ -394,6 +553,10 @@
         body.subpage-open #help-btn,      body.modal-open #help-btn,
         body.subpage-open #hearts-hud,    body.modal-open #hearts-hud,
         body.subpage-open #score-hud,     body.modal-open #score-hud,
+        body.subpage-open #zscore-hud,    body.modal-open #zscore-hud,
+        body.subpage-open #cscore-hud,    body.modal-open #cscore-hud,
+        body.subpage-open #plank-hud,     body.modal-open #plank-hud,
+        body.subpage-open #extra-btns,    body.modal-open #extra-btns,
         body.subpage-open #exit-btn,      body.modal-open #exit-btn,
         body.subpage-open #music-btn,     body.modal-open #music-btn {
             display: none !important;
@@ -402,8 +565,12 @@
         body:not(.hud-ready) #action-btn,
         body:not(.hud-ready) #music-btn,
         body:not(.hud-ready) #exit-btn,
+        body:not(.hud-ready) #extra-btns,
         body:not(.hud-ready) #hearts-hud,
         body:not(.hud-ready) #score-hud,
+        body:not(.hud-ready) #zscore-hud,
+        body:not(.hud-ready) #cscore-hud,
+        body:not(.hud-ready) #plank-hud,
         body:not(.hud-ready) #help-btn { display: none; }
 
         /* ---- Pixelated controls / tutorial popup ---- */
@@ -643,6 +810,12 @@
         }
         .gate-btn:hover { background: #f5f5f5; color: #05050a; }
         .gate-btn:active { transform: translateY(2px); }
+        /* Matrix pills: red = the fast recruiter path, blue = fall down the
+           rabbit hole into the game. */
+        .gate-btn--recruiter { border-color: #ff4d4d; color: #ff4d4d; }
+        .gate-btn--recruiter:hover { background: #ff4d4d; color: #05050a; }
+        .gate-btn--everyone { border-color: #4da6ff; color: #4da6ff; }
+        .gate-btn--everyone:hover { background: #4da6ff; color: #05050a; }
 
         /* Pixel mode — applied to the whole gate while "Everyone Else" is hovered */
         #visitor-gate.gate-pixel .gate-title,
@@ -686,8 +859,8 @@
         <div class="gate-inner">
             <h1 class="gate-title">Who are you?</h1>
             <div class="gate-buttons">
-                <button class="gate-btn gate-btn--recruiter" data-visitor="recruiter">Recruiter</button>
-                <button class="gate-btn gate-btn--everyone" data-visitor="everyone">Everyone Else</button>
+                <button class="gate-btn gate-btn--recruiter" data-visitor="recruiter">Red Pill</button>
+                <button class="gate-btn gate-btn--everyone" data-visitor="everyone">Blue Pill</button>
             </div>
         </div>
     </div>

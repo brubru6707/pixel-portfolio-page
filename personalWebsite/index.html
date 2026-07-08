@@ -1,23 +1,75 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
 <!-- For Deployment -->
-    <title>Bruno Rodriguez-Mendez Portfolio</title>
+    <title>Bruno Rodriguez-Mendez — Software Engineer | Brown University</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="description" content="Portfolio of Bruno Rodriguez-Mendez, software engineer and Computer & Electrical Engineering student at Brown University. Full-stack web apps, AI research, hardware projects, and more.">
+    <meta name="author" content="Bruno Rodriguez-Mendez">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://bruno-rodriguez-mendez.com/personalWebsite/">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://brunorodriguezmendez.com/">
-    <meta property="og:title" content="Bruno Rodriguez-Mendez">
-    <meta property="og:author" content="Bruno Rodriguez-Mendez">
-    <meta property="og:description" content="BrownU Software Engineer">
+    <meta property="og:url" content="https://bruno-rodriguez-mendez.com/personalWebsite/">
+    <meta property="og:title" content="Bruno Rodriguez-Mendez — Software Engineer">
+    <meta property="og:site_name" content="Bruno Rodriguez-Mendez">
+    <meta property="og:description" content="Software engineer & Computer + Electrical Engineering student at Brown University. Full-stack web apps, AI research, and hardware projects.">
+    <meta property="og:image" content="https://bruno-rodriguez-mendez.com/assets/subdomains/personal-website.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Bruno Rodriguez-Mendez — Software Engineer">
+    <meta name="twitter:description" content="Software engineer & Computer + Electrical Engineering student at Brown University.">
+    <meta name="twitter:image" content="https://bruno-rodriguez-mendez.com/assets/subdomains/personal-website.png">
     <link rel="icon" href="/assets/brubru.jpg" type="image/JPG">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "name": "Bruno Rodriguez-Mendez",
+      "url": "https://bruno-rodriguez-mendez.com/",
+      "image": "https://bruno-rodriguez-mendez.com/assets/brubru.jpg",
+      "jobTitle": "Software Engineer",
+      "affiliation": { "@type": "CollegeOrUniversity", "name": "Brown University" },
+      "alumniOf": [
+        { "@type": "CollegeOrUniversity", "name": "Valencia College" }
+      ],
+      "sameAs": [
+        "https://github.com/brubru6707",
+        "https://www.linkedin.com/in/bruno-rodriguez-mendez-18723725b/"
+      ]
+    }
+    </script>
     <!-- For Development -->
 <link rel="stylesheet" href="index.css">
-<link rel="stylesheet" href="../index.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Background stack (back to front): the project video at FULL opacity,
+         then an opaque black cover with gooey falling drip-holes punched
+         through it (the goop reveals the video), then the two colored
+         triangles as translucent tints. Where a goop drip crosses a triangle,
+         the revealed video takes that triangle's tint. -->
+    <div id="video-layer">
+      <div id="bg-video-target"></div>
+    </div>
+    <canvas id="goop-cover" aria-hidden="true"></canvas>
+    <!-- The classic gooey filter (blur + alpha threshold), applied to the
+         cover canvas via CSS filter: url(#goo). No feBlend here: the cover is
+         inverted (holes in a solid), so only blur+threshold do the merging. -->
+    <svg id="goop-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="goo">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" />
+        </filter>
+      </defs>
+    </svg>
     <div id="background"></div>
-    <div id="goop-layer"></div>
+    <!-- Bottom-left badge naming the project whose video is playing behind the page -->
+    <div id="now-playing" aria-live="polite">
+        <span id="now-playing-dot"></span>
+        <span id="now-playing-label">background:</span>
+        <span id="now-playing-name"></span>
+    </div>
     <header>
         <div id="title-name">
             Bruno Rodriguez-Mendez
@@ -30,11 +82,6 @@
             <a href="#awards-holder" class="nav-link">Awards</a>
             <a href="https://docs.google.com/document/d/e/2PACX-1vTtgx6EtlFA9VhXyBtbY8kzJ2tJox4MD2sgHUWdA_iKLniR2K2Qv6JH1_AzwVOSxpfbOAKWPkxpMwE0/pub" target="_blank" class="nav-link resume-link">Resume</a>
         </nav>
-        <div id="title-info">
-            <div id="title-info-job">
-                Software Engineer
-            </div>
-        </div>
     </header>
     <div style="visibility: hidden;">wow! you found this :)</div>
     <div class="space" id="intro-holder">
@@ -268,7 +315,6 @@
         </iframe>
     </div>
     </div>
-    <div id="escButton-holder"><div id="escButton"><div id="escButton-image"></div></div></div>
     <footer>
         <!-- For Deployment -->
         <script src="index.js"></script>
@@ -290,3 +336,4 @@
         </div>
     </footer>
 </body>
+</html>

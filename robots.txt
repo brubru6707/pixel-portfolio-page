@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bruno-rodriguez-mendez.com/sitemap.xml

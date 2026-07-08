@@ -40,90 +40,9 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-document.getElementById('escButton-holder').addEventListener('click', function() {
-    if (isMobile) {
-        window.parent.postMessage('ESCAPE_PRESSED', '*');
-    }
-});
-
-window.addEventListener('message', (event) => {
-    if (event.data === 'INFORM USER') {
-        document.getElementById('escButton-holder').style.visibility = 'visible';
-    } else if (event.data === 'DISABLE INTERACTION') {
-        // Aggressive lockdown for mobile/iOS Safari
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.top = '0';
-        document.body.style.left = '0';
-        document.body.style.width = '100%';
-        document.body.style.height = '100%';
-        document.body.style.touchAction = 'none';
-        document.body.style.userSelect = 'none';
-        document.body.style.WebkitTouchCallout = 'none';
-        document.body.style.WebkitUserSelect = 'none';
-        document.body.style.KhtmlUserSelect = 'none';
-        document.body.style.MozUserSelect = 'none';
-        document.body.style.msUserSelect = 'none';
-        
-        // iOS Safari specific fixes
-        document.body.style.WebkitOverflowScrolling = 'touch'; // Actually disable it
-        document.documentElement.style.overflow = 'hidden';
-        document.documentElement.style.position = 'fixed';
-        document.documentElement.style.width = '100%';
-        document.documentElement.style.height = '100%';
-        
-        // Disable all pointer events except for the ESC button
-        document.body.style.pointerEvents = 'none';
-        document.documentElement.style.pointerEvents = 'none';
-        const escButton = document.getElementById('escButton-holder');
-        if (escButton) {
-            escButton.style.pointerEvents = 'auto';
-            escButton.style.WebkitTouchCallout = 'default';
-            escButton.style.WebkitUserSelect = 'auto';
-        }
-        
-        // Prevent all touch and scroll events
-        const preventAll = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        };
-        
-        // Add multiple layers of event prevention
-        document.addEventListener('touchstart', preventAll, { passive: false, capture: true });
-        document.addEventListener('touchmove', preventAll, { passive: false, capture: true });
-        document.addEventListener('touchend', preventAll, { passive: false, capture: true });
-        document.addEventListener('wheel', preventAll, { passive: false, capture: true });
-        document.addEventListener('scroll', preventAll, { passive: false, capture: true });
-        document.addEventListener('gesturestart', preventAll, { passive: false, capture: true });
-        document.addEventListener('gesturechange', preventAll, { passive: false, capture: true });
-        document.addEventListener('gestureend', preventAll, { passive: false, capture: true });
-        
-        // iOS Safari momentum scrolling prevention
-        document.addEventListener('touchstart', function(e) {
-            if (e.target !== escButton && !escButton.contains(e.target)) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        
-        console.log('Interaction disabled for iframe overlay');
-    } else if (event.data === 'ENABLE INTERACTION') {
-        // Re-enable interaction
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.touchAction = '';
-        document.body.style.userSelect = '';
-        document.body.style.pointerEvents = '';
-        document.body.style.WebkitTouchCallout = '';
-        document.body.style.WebkitUserSelect = '';
-        document.documentElement.style.overflow = '';
-        document.documentElement.style.position = '';
-        
-        // Remove all event listeners (this is a simplified cleanup)
-        console.log('Interaction re-enabled');
-    }
-});
-
+// (The old floating esc-key.png button + the INFORM USER / DISABLE INTERACTION
+// message handlers are gone — the game's own "BACK" button owns closing the
+// embedded view now, and the esc-key image should never appear on this page.)
 
 if (isMobile) {
     document.body.classList.add('is-mobile');
@@ -131,34 +50,42 @@ if (isMobile) {
 
 const projectDict = {
   "Cleaning": {
+    name: "Cleaning Website",
     description: "This is a cleaning website that I made for a customer. I designed the site in Figma, used the Next.js framework, incorporated MUI tools from Google, deployed it using Vercel, and purchased a Cloudflare domain for the client. I also assisted them with domain forwarding.",
     videoId: "MU29LHSan7s"
   },
   "SAT": {
+    name: "SAT Study Website",
     description: "This is an SAT (standardized test) study website that I created for students to get study help. I sourced all the questions and responses from the SAT question bank, extracted them to my local server, and then transferred them to my Firebase database. I designed the website progressively, adding Firebase OAuth, MUI tools, the Gemini AI API, and deployed it using Vercel.",
     videoId: "5STXbS4Zbwk"
   },
   "Sandbox": {
+    name: "Sandbox Game",
     description: "This is a C++ game where I utilized SFML, custom data structures, and memory management to create multiple entities on-screen that acted as elements such as rock, water, and sand. The elements could interact with each other and had their own physics.",
     videoId: "Xn1EZlRGCj0"
   },
   "Raycaster": {
+    name: "Raycaster",
     description: "This is a C++ game where I utilized SFML to create a 3D rendering of a 2D map.",
     videoId: "R9uFJCGIhYg"
   },
   "Battery": {
+    name: "Battery Bank (e-waste)",
     description: "This is a beta portable battery bank that I created using a lithium battery from a vape. I incorporated a charger and a voltage variable module to charge the battery bank and discharge the appropriate voltage to phones and other appliances.",
     videoId: "Qli8OGthsF0"
   },
   "Circuit": {
+    name: "Circuit Gift",
     description: "This is a gift that I made for a friend, where I designed the circuit in KiCad and the casing in FreeCAD. I sourced the motor component from e-waste and also included cryptocurrency as a surprise element inside the gift.",
     videoId: "zG51ETyX5W0"
   },
   "Inventory": {
+    name: "Inventory System",
     description: "This is a project I haven't finished yet, as it's still in the beta phase. However, in its current miniature form, it utilizes cardboard, a scissor lift, a client-to-server connection, and AI text analysis to manage inventory. It can also be controlled via a TV remote.",
     videoId: "-HSq1XvC44M"
   },
   "Lego": {
+    name: "Lego Cars",
     description: "This project utilizes both Lego and Arduino, along with a custom-designed battery holder in series to power the Lego components and attached DC motors. The car is controlled using a TV remote.",
     videoId: "6gf6aHQHjY0"
   }
@@ -166,7 +93,6 @@ const projectDict = {
 
 // Getting the first word that comes from the project name so that I can then load up the modal and the respective video/desc
 function openModal() {
-    document.getElementById('escButton-holder').style.visibility = "hidden"
     let innerText = event.target.innerText;
     let firstProjWord = innerText.split(' ')[0];
     let project = projectDict[firstProjWord];
@@ -192,7 +118,6 @@ function openModal() {
 }
 
 function closeModal() {
-    document.getElementById('escButton-holder').style.visibility = "visible"
     const modal = document.getElementById('modal');
     const modalVideo = document.getElementById('modal-video');
     
@@ -211,45 +136,189 @@ window.onclick = function(event) {
 };
 
 /* =====================================================================
-   Splatoon-style rainbow goop — drips down from the two intro triangles
-   once their slide-in animations finish (#background is the last, ~3s).
+   Full-page background video — once the intro triangles finish sliding
+   in (#background is the last, ~3s), a muted YouTube video starts
+   cycling randomly through the same project videoIds used in the modals
+   above. It fills the whole viewport at reduced opacity (#video-layer),
+   so it reads as a black-tinted video outside the triangles, and the
+   translucent triangles above it add their green/red color tints.
+   A bottom-left "now playing" badge names the project whose video is
+   currently running (updated on every video change).
    ===================================================================== */
 (function () {
-    const GOOP_COLORS = [
-        '#ff2e63', '#ff8b00', '#ffd500', '#3ddc84',
-        '#00c2ff', '#4d5bff', '#b14dff', '#ff4de0'
-    ];
+    const VIDEO_IDS = Object.keys(projectDict)
+        .map(function (key) { return projectDict[key].videoId; })
+        .filter(Boolean);
+    // videoId -> human-readable project name, for the "now playing" badge.
+    const VIDEO_NAMES = {};
+    Object.keys(projectDict).forEach(function (key) {
+        const p = projectDict[key];
+        if (p.videoId) VIDEO_NAMES[p.videoId] = p.name || key;
+    });
 
-    function spawnGoop() {
-        const layer = document.getElementById('goop-layer');
-        if (!layer || layer.dataset.done) return;
-        layer.dataset.done = '1';
+    function pickRandomVideoId(excludeId) {
+        if (VIDEO_IDS.length <= 1) return VIDEO_IDS[0];
+        let id;
+        do {
+            id = VIDEO_IDS[Math.floor(Math.random() * VIDEO_IDS.length)];
+        } while (id === excludeId);
+        return id;
+    }
 
-        const count = 14;
-        for (let i = 0; i < count; i++) {
-            const drip = document.createElement('div');
-            drip.className = 'goop-drip';
-            const color = GOOP_COLORS[Math.floor(Math.random() * GOOP_COLORS.length)];
-            const width = 22 + Math.random() * 55;          // px
-            const left = (i / count) * 100 + (Math.random() * 6 - 3); // %
-            const height = 45 + Math.random() * 55;          // vh
-            drip.style.left = left + '%';
-            drip.style.width = width + 'px';
-            drip.style.height = height + 'vh';
-            drip.style.background = 'linear-gradient(to bottom, ' + color + ' 0%, ' + color + ' 70%, ' + color + 'cc 100%)';
-            drip.style.animationDelay = (Math.random() * 0.6) + 's';
-            layer.appendChild(drip);
+    // Update + show the bottom-left "now playing" badge with a little pop.
+    function showNowPlaying(videoId) {
+        const badge = document.getElementById('now-playing');
+        const nameEl = document.getElementById('now-playing-name');
+        if (!badge || !nameEl) return;
+        nameEl.textContent = VIDEO_NAMES[videoId] || 'a project';
+        badge.classList.add('show');
+        badge.classList.remove('pop');
+        void badge.offsetWidth; // restart the pop animation
+        badge.classList.add('pop');
+    }
+
+    function styleVideoIframe(iframe) {
+        iframe.style.position = 'absolute';
+        iframe.style.top = '50%';
+        iframe.style.left = '50%';
+        iframe.style.width = '177.78vh';   // oversized + centered "cover" trick so the
+        iframe.style.height = '100vh';     // video always fills the viewport with no
+        iframe.style.minWidth = '100%';    // letterboxing, regardless of aspect ratio
+        iframe.style.minHeight = '56.25vw';
+        iframe.style.transform = 'translate(-50%, -50%)';
+        iframe.style.border = '0';
+        iframe.style.pointerEvents = 'none';
+    }
+
+    window.onYouTubeIframeAPIReady = function () {
+        if (!VIDEO_IDS.length || !document.getElementById('bg-video-target')) return;
+        const firstId = pickRandomVideoId();
+        new YT.Player('bg-video-target', {
+            videoId: firstId,
+            playerVars: {
+                autoplay: 1,
+                mute: 1,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                iv_load_policy: 3,
+                modestbranding: 1,
+                playsinline: 1,
+                rel: 0
+            },
+            events: {
+                onReady: function (e) {
+                    e.target.mute();
+                    styleVideoIframe(e.target.getIframe());
+                    e.target.playVideo();
+                },
+                onStateChange: function (e) {
+                    if (e.data === YT.PlayerState.PLAYING) {
+                        // Fade the layer in only once frames are actually coming,
+                        // and (re)label the badge with the current project.
+                        const layer = document.getElementById('video-layer');
+                        if (layer) layer.classList.add('playing');
+                        const data = e.target.getVideoData && e.target.getVideoData();
+                        showNowPlaying((data && data.video_id) || firstId);
+                    } else if (e.data === YT.PlayerState.ENDED) {
+                        const data = e.target.getVideoData && e.target.getVideoData();
+                        e.target.loadVideoById(pickRandomVideoId(data && data.video_id));
+                    }
+                }
+            }
+        });
+    };
+
+    function loadYouTubeApi() {
+        if (window.YT && window.YT.Player) {
+            window.onYouTubeIframeAPIReady();
+            return;
         }
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+    }
+
+    let started = false;
+    function start() {
+        if (started) return;
+        started = true;
+        loadYouTubeApi();
     }
 
     const bg = document.getElementById('background');
     if (bg) {
-        bg.addEventListener('animationend', spawnGoop, { once: true });
+        bg.addEventListener('animationend', start, { once: true });
         // Fallback in case the animationend event doesn't fire (e.g. reduced motion).
-        setTimeout(spawnGoop, 3400);
+        setTimeout(start, 3400);
     } else {
-        window.addEventListener('DOMContentLoaded', spawnGoop);
+        window.addEventListener('DOMContentLoaded', start);
     }
+})();
+
+/* =====================================================================
+   Goop reveal — the dripping-liquid effect over the background video.
+   The #goop-cover canvas is an opaque black sheet between the video and
+   the triangles. Every frame we repaint it black and punch the falling
+   drips through it with destination-out; the CSS `filter: url(#goo)`
+   (gaussian blur + alpha threshold) on the canvas merges nearby holes
+   into one gooey blob, exactly like the classic CSS goo tutorial —
+   inverted into a reveal, so the drips read as liquid made of video.
+   ===================================================================== */
+(function () {
+    const canvas = document.getElementById('goop-cover');
+    if (!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext('2d');
+
+    let W = 0, H = 0;
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Falling drips, ported from the tutorial's 20 nth-child variants but
+    // spread across the whole viewport (fewer + no-repaint-waste on phones).
+    const COUNT = window.innerWidth < 700 ? 12 : 20;
+    const drips = [];
+    for (let i = 0; i < COUNT; i++) {
+        drips.push({
+            x: (i + Math.random()) / COUNT,          // spread over the width
+            r: 6 + Math.random() * 26,               // drip radius, px
+            delay: i * 0.21 + Math.random() * 0.25,  // like the -0.2s stagger
+            dur: 4.4 + Math.random() * 1.6           // ~5s fall, like the original
+        });
+    }
+
+    // The tutorial's @keyframes falling: top -100% → 0% → 80% → 100%,
+    // as a piecewise function of loop progress p in [0,1).
+    function dripTop(p) {
+        if (p < 0.5) return -1 + p / 0.5;            // -100% → 0%
+        if (p < 0.8) return ((p - 0.5) / 0.3) * 0.8; // 0% → 80%
+        return 0.8 + ((p - 0.8) / 0.2) * 0.2;        // 80% → 100%
+    }
+
+    function frame(now) {
+        const t = now / 1000;
+        // Opaque cover...
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+        // ...with the drips punched out of it.
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = '#fff';
+        for (const d of drips) {
+            const p = ((t + d.delay) / d.dur) % 1;
+            const y = dripTop(p) * H + d.r;          // enter from above the top edge
+            ctx.beginPath();
+            ctx.arc(d.x * W, y, d.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
 })();
 
 /* =====================================================================

@@ -233,9 +233,17 @@ export default class DoomView {
         const drawList = [];
         for (const e of entities) {
             if (!e || !e.active || !e.visible) continue;
-            const dx = e.x - px;
-            const dy = e.y - py;
-            const forward = dx * cosA + dy * sinA;   // perpendicular depth
+            // The website preview is anchored to the COMPUTER's world position
+            // (not its own, which sits "north" of it in top-down coords and made
+            // it sort behind the computer from some angles). Same depth + a tiny
+            // bias keeps it drawn just after — i.e. always in front of — the
+            // computer, no matter where the player stands.
+            const isPreview = e === this.scene.computerPreview;
+            const anchor = isPreview && this.scene.computer ? this.scene.computer : e;
+            const dx = anchor.x - px;
+            const dy = anchor.y - py;
+            let forward = dx * cosA + dy * sinA;     // perpendicular depth
+            if (isPreview) forward -= 0.5;
             if (forward < 12 || forward > s.renderDist) continue;
             const right = -dx * sinA + dy * cosA;
             drawList.push({ e, forward, right });
