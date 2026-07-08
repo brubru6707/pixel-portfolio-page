@@ -1,0 +1,13 @@
+[Unit]
+Description=Update Cloudflare DNS record to this instance's current public IP
+After=network-online.target
+Wants=network-online.target
+Before=presence-server.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/presence-ddns.env
+ExecStart=/home/ec2-user/app/server/deploy/update-dns.sh
+
+[Install]
+WantedBy=multi-user.target

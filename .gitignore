@@ -1,2 +1,5 @@
 # Local-only handoff / working notes — never pushed
 handoff/
+*.pem
+.pem
+secrets

@@ -1,0 +1,19 @@
+[Unit]
+Description=Pixel portfolio multiplayer presence WebSocket server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/app/server
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=3
+Environment=PORT=443
+Environment=CERT_PATH=/home/ec2-user/app/server/certs/fullchain.pem
+Environment=KEY_PATH=/home/ec2-user/app/server/certs/privkey.pem
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

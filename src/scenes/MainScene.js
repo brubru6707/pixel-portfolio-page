@@ -2,6 +2,13 @@ import { isLikelyMobileDevice, createAnimations, subdomains, detectDevicePerform
 import GhostEntity from '../entities/GhostEntity.js';
 import SoundManager from '../utils/SoundManager.js';
 import DoomView from '../utils/DoomView.js';
+import NetworkManager from '../utils/NetworkManager.js';
+import { WS_URL } from '../config/network.js';
+
+// Tints applied to remote players' sprites (cycled by player number) so
+// multiple ghosts on screen stay visually distinct from each other and from
+// the un-tinted local player.
+const REMOTE_PLAYER_TINTS = [0x66d9ff, 0xffb86c, 0xff79c6, 0x50fa7b, 0xbd93f9, 0xf1fa8c];
 
 let downF;
 let playerNearTree = false;
@@ -27,6 +34,9 @@ export default class MainScene extends Phaser.Scene {
         this.movementTimer = null;
         this.mobilePlayerMove = false;
         this.ghosts = [];
+        // Other connected players — non-interactive "Player N" ghosts driven
+        // by NetworkManager (see _syncRemotePlayers/_updateRemotePlayers).
+        this.remotePlayers = [];
         this.playerMoved = false;
         this.is3D = false;
         this.doomAngle = 0; // player facing direction in first-person (DOOM) mode
@@ -171,6 +181,12 @@ export default class MainScene extends Phaser.Scene {
         // First-person raycasting renderer (overlay canvas). The Phaser world
         // keeps simulating underneath; DoomView paints the DOOM view on top.
         this.doomView = new DoomView(this, worldWidth, worldHeight);
+
+        // Multiplayer presence: other connected players render as translucent,
+        // non-interactive "Player N" ghosts (see _syncRemotePlayers below).
+        this._network = new NetworkManager(WS_URL, {
+            onState: (players) => this._syncRemotePlayers(players)
+        });
 
         // Add objects in the center of the world
         this.computer = this.physics.add.staticSprite(worldWidth / 2, worldHeight / 2, 'computer', 0).setScale(15).refreshBody();
@@ -484,6 +500,9 @@ export default class MainScene extends Phaser.Scene {
             document.removeEventListener('keydown', this._escKeyHandler);
             this.scale.off('resize', this.handleResize, this);
             this.destroyHUD();
+            this._network.destroy();
+            this.remotePlayers.forEach(rp => { rp.sprite.destroy(); rp.label.destroy(); });
+            this.remotePlayers = [];
         });
     }
 
@@ -1067,6 +1086,7 @@ export default class MainScene extends Phaser.Scene {
     // then paint the raycast view. Replaces the whole top-down update() path.
     updateDoomFrame() {
         if (this.inOhs) this.ohsGhosts.forEach(g => this._wanderGhost(g, this.game.loop.delta));
+        this._updateRemotePlayers();
         this._updateZombies();
         this.updateDoomMovement();
 
@@ -1116,6 +1136,68 @@ export default class MainScene extends Phaser.Scene {
         this.setActionHint(facingSomething);
     }
 
+    // Reconcile the scene's remote-player ghosts against the latest state
+    // broadcast from the presence server (id → {num, x, y, dir}). Creates
+    // sprites for newly-seen players, drops ones who disconnected; actual
+    // per-frame motion/animation happens in _updateRemotePlayers.
+    _syncRemotePlayers(players) {
+        const incomingIds = new Set(players.map(p => p.id));
+        this.remotePlayers = this.remotePlayers.filter(rp => {
+            if (incomingIds.has(rp.id)) return true;
+            rp.sprite.destroy();
+            rp.label.destroy();
+            return false;
+        });
+        for (const p of players) {
+            let rp = this.remotePlayers.find(r => r.id === p.id);
+            if (!rp) {
+                const sprite = this.add.sprite(p.x, p.y, 'me', 0)
+                    .setScale(3).setDepth(5).setAlpha(0.6)
+                    .setTint(REMOTE_PLAYER_TINTS[p.num % REMOTE_PLAYER_TINTS.length]);
+                const label = this.add.text(p.x, p.y - 60, `Player ${p.num}`, {
+                    fontFamily: 'monospace', fontSize: '18px', fill: '#ffffff',
+                    stroke: '#000000', strokeThickness: 3
+                }).setOrigin(0.5).setDepth(6);
+                rp = { id: p.id, sprite, label, targetX: p.x, targetY: p.y, dir: p.dir };
+                this.remotePlayers.push(rp);
+            }
+            rp.num = p.num;
+            rp.targetX = p.x;
+            rp.targetY = p.y;
+            rp.dir = p.dir;
+            rp.label.setText(`Player ${p.num}`);
+        }
+    }
+
+    // Runs every frame (both top-down and DOOM): sends the local player's
+    // position to the presence server and smoothly interpolates + animates
+    // every other player's ghost sprite toward its latest known position.
+    // Ghosts only render in the main world — sub-worlds are a private swap.
+    _updateRemotePlayers() {
+        this._network.sendPos(this.player.x, this.player.y, this._netDirection());
+        const visible = !this.inOhs;
+        for (const rp of this.remotePlayers) {
+            rp.sprite.setVisible(visible);
+            rp.label.setVisible(visible);
+            if (!visible) continue;
+            rp.sprite.x = Phaser.Math.Linear(rp.sprite.x, rp.targetX, 0.25);
+            rp.sprite.y = Phaser.Math.Linear(rp.sprite.y, rp.targetY, 0.25);
+            rp.label.setPosition(rp.sprite.x, rp.sprite.y - 60);
+            const animKey = rp.dir && rp.dir !== 'idle' ? `${rp.dir}-me` : 'idle-me';
+            if (!rp.sprite.anims.currentAnim || rp.sprite.anims.currentAnim.key !== animKey) {
+                rp.sprite.play(animKey, true);
+            }
+        }
+    }
+
+    // Direction suffix ('up'/'down'/'left'/'right'/'idle') matching whatever
+    // <dir>-me animation is currently playing on the local player, so remote
+    // clients can mirror it on their copy of our ghost.
+    _netDirection() {
+        const key = this.player.anims.currentAnim && this.player.anims.currentAnim.key;
+        return key ? key.replace('-me', '') : 'idle';
+    }
+
     // Billboard list for the current world (3D). Main: trees + computer (+ its
     // preview) + orb + live bombs. Sub-worlds: the project images + exit sign
     // + ghosts. Zombies, planks, slashes, the cowboy + his bullets, heart
@@ -1126,6 +1208,7 @@ export default class MainScene extends Phaser.Scene {
             ...this.slashGroup.getChildren(),
             ...this.bulletGroup.getChildren(),
             ...this._zenithAxes,
+            ...this.remotePlayers.map(rp => rp.sprite),
         ];
         if (this.cowboy && this.cowboy.active) extras.push(this.cowboy);
         if (this.inOhs) {
@@ -1184,6 +1267,7 @@ export default class MainScene extends Phaser.Scene {
 
         // Roaming OHS ghosts wander while we're in the OHS sub-world.
         if (this.inOhs) this.ohsGhosts.forEach(g => this._wanderGhost(g, this.game.loop.delta));
+        this._updateRemotePlayers();
 
         // Hide instructions when player moves
         if (!this.playerMoved && this.instructionsImage && this.instructionsImage.visible) {
