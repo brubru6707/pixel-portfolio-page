@@ -18,6 +18,9 @@ and cut down entities to open his projects. Live at [bruno-rodriguez-mendez.com]
   no Phaser). Recruiters from the intro gate land here directly; it's also reachable on its own.
 - **`assets/`** — sprites, screenshots, and project previews used by both the game and the personal
   site (`assets/subdomains/`, `assets/other-projects/`).
+- **`server/`** — the multiplayer presence server: a minimal WebSocket relay (Node + `ws`) that
+  broadcasts player positions so other visitors render as non-interactive ghosts. Anonymous,
+  in-memory, no persistence, no auth.
 
 ## Running locally
 
@@ -51,3 +54,15 @@ Static site, deployed via GitHub Pages with a custom domain (`CNAME`).
   gives recruiters a fast, no-game path to the same content
 - The recruiter site's background video hides behind an opaque goop cover — gooey drips reveal it,
   tinted by the triangles they cross
+- Lightweight multiplayer: other visitors appear as ghosts (position + facing only, no interaction)
+  via a small WebSocket presence server
+
+## Contributing
+
+Bug fixes and small features are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how to run
+things locally and what to check before opening a PR.
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE) — free to use, run, and modify for non-commercial purposes.
+Commercial use is not permitted.

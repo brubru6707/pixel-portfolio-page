@@ -3,3 +3,13 @@ handoff/
 *.pem
 .pem
 secrets
+
+# Dependencies — contributors run npm install
+node_modules/
+server/node_modules/
+
+# OS / editor cruft
+.DS_Store
+*.log
+.vscode/
+.idea/
