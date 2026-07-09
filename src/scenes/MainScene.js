@@ -139,6 +139,14 @@ export default class MainScene extends Phaser.Scene {
     }
 
     preload() {
+        // Cover the black canvas gap with the pixel loading dial while all
+        // the spritesheets/previews below come in — driven by Phaser's own
+        // load-progress events, not a fake timer.
+        if (typeof window.showGameLoading === 'function') window.showGameLoading();
+        this.load.on('progress', (value) => {
+            if (typeof window.updateGameLoading === 'function') window.updateGameLoading(value);
+        });
+
         this.load.spritesheet('me', 'assets/me-sprite.png', { frameWidth: 13, frameHeight: 15 });
         // Same sheet layout as the player sprite (idle + 4-direction walk).
         this.load.spritesheet('zombie', 'assets/zombie.png', { frameWidth: 13, frameHeight: 15 });
@@ -415,11 +423,11 @@ export default class MainScene extends Phaser.Scene {
             callback: () => this._maybeSpawnHeartPickup()
         });
 
-        // --- Cowboy bullets (he shoots them; the player eats them) ---
+        // --- Cowboy bullets (he shoots them; ONLY the player eats them) ---
+        // They phase straight through trees, planks, zombies, everything — the
+        // player is the one and only thing his lead can touch.
         this.bulletGroup = this.physics.add.group();
         this.physics.add.overlap(this.bulletGroup, this.player, this._bulletHitsPlayer, null, this);
-        this.physics.add.overlap(this.bulletGroup, this.trees, (b) => this._popBullet(b), null, this);
-        this.physics.add.overlap(this.bulletGroup, this.plankGroup, (b) => this._popBullet(b), null, this);
 
         // Keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -824,6 +832,7 @@ export default class MainScene extends Phaser.Scene {
         this._hudEls.push(toast);
 
         document.body.classList.add('hud-ready');
+        if (typeof window.hideGameLoading === 'function') window.hideGameLoading();
 
         // Show the controls tutorial once on entry.
         if (!this.tutorialShown) this.showTutorial();
@@ -1234,7 +1243,7 @@ export default class MainScene extends Phaser.Scene {
             const now = this.time.now;
             if (!this.axeWasActive || now - this.lastSwingAt > 450) {
                 this.lastSwingAt = now;
-                this._fireSlash(Math.cos(this.doomAngle), Math.sin(this.doomAngle));
+                this._tryFireSlash(Math.cos(this.doomAngle), Math.sin(this.doomAngle));
             }
         } else {
             this.axe.body.enable = false;
@@ -1545,7 +1554,9 @@ export default class MainScene extends Phaser.Scene {
                 this.spawnSlash(this.lastDirection);
             }
 
-            this.axeRotations += this.axeRotations < 0.5 ? this.axeRotations * 1.01 + 0.01 : 0.5;
+            // Hold to keep it whirling: constant angular speed, so the axe just
+            // spins round and round the player for as long as the button's down.
+            this.axeRotations = (this.axeRotations || 0) + 0.4;
             const sw = this.axeRotations;
             const off = 10;
             // The axe HEAD mirrors the player's facing: raw sprite's head points
@@ -1778,8 +1789,9 @@ export default class MainScene extends Phaser.Scene {
         const m = map[dir] || map.right;
         // The slash is also the RANGED attack: launch a flying arc that
         // damages zombies/the cowboy (2 slash hits kill a regular zombie).
+        // Locked unless the player is at FULL health — melee still works hurt.
         const mag = Math.hypot(m.dx, m.dy) || 1;
-        this._fireSlash(m.dx / mag, m.dy / mag);
+        this._tryFireSlash(m.dx / mag, m.dy / mag);
         // A soft cyan under-glow + a bright white core, both sweeping through
         // the arc — reads as a crisp nail-slash flash.
         const glow = this.add.image(this.player.x + m.dx, this.player.y + m.dy, 'fxSlash')
@@ -1958,8 +1970,11 @@ export default class MainScene extends Phaser.Scene {
         }
         if (!ok) return;
         // Once in a while a BIG one lumbers in: 7x the health, 1.5 hearts of
-        // damage on touch, slower but much harder to put down.
+        // damage on touch, slower but much harder to put down. Otherwise there's
+        // a chance of a FIRE zombie: regular-sized, red-hot, and it spits a
+        // cone of flame that scorches the player for half a heart from afar.
         const big = Math.random() < 0.12;
+        const fire = !big && Math.random() < 0.25;
         const z = this.zombieGroup.create(x, y, 'zombie', 0).setScale(big ? 5.5 : 3);
         z.setCollideWorldBounds(true);
         z.setDepth(5);
@@ -1967,22 +1982,33 @@ export default class MainScene extends Phaser.Scene {
         z._nextRepath = 0;
         z._stunUntil = 0;
         z._big = big;
+        z._fire = fire;
+        z._nextSpit = this.time.now + 1200 + Math.random() * 800;
         // Health is in SLASH units: ranged slash = 1, axe chop = 2.
-        // Regular zombie: 2 (two slashes or one chop). Big: 7x that.
-        z._hp = big ? 14 : 2;
-        z._speed = big ? 60 : 85;
+        // Regular zombie: 2 (two slashes or one chop). Big: 7x that. Fire: 3.
+        z._hp = big ? 14 : (fire ? 3 : 2);
+        z._speed = big ? 60 : (fire ? 78 : 85);
         if (big) z.setTint(0x9adf6a);
+        else if (fire) z.setTint(0xff6a3d);
         z.play('down-zombie');
         this.zombies.push(z);
-        // Rises out of the ground in a puff of sickly green pixels.
-        this._pixelBurst(x, y, {
+        // Rises out of the ground in a puff of pixels — green for the undead,
+        // ember-orange for the fire-breathers.
+        this._pixelBurst(x, y, fire ? {
+            colors: [0xff3b00, 0xff6a00, 0xff9500, 0xffe500],
+            count: 18, minSpeed: 60, maxSpeed: 210, gravity: 380
+        } : {
             colors: [0x4a9c2d, 0x7be04a, 0x306b1c, 0x9adf6a],
             count: big ? 30 : 14, minSpeed: 60, maxSpeed: big ? 260 : 190, gravity: 380
         });
         if (this.doomView && this.doomView.active) {
-            this.doomView.burstAtWorld(x, y, { colors: ['#4a9c2d', '#7be04a', '#306b1c'], count: 14 });
+            this.doomView.burstAtWorld(x, y, {
+                colors: fire ? ['#ff3b00', '#ff6a00', '#ffe500'] : ['#4a9c2d', '#7be04a', '#306b1c'],
+                count: 14
+            });
         }
         if (big) this.showToast('A BIG ZOMBIE EMERGES...', 2200);
+        else if (fire) this.showToast('A FIRE ZOMBIE HISSES...', 2200);
     }
 
     // Per-frame zombie brain: staggered A* re-paths toward the player, waypoint
@@ -2016,6 +2042,53 @@ export default class MainScene extends Phaser.Scene {
             const vx = z.body.velocity.x, vy = z.body.velocity.y;
             if (Math.abs(vx) > Math.abs(vy)) z.play(vx > 0 ? 'right-zombie' : 'left-zombie', true);
             else z.play(vy > 0 ? 'down-zombie' : 'up-zombie', true);
+
+            // Fire zombies belch a cone of flame at the player when in range.
+            if (z._fire && now >= (z._nextSpit || 0) && distToPlayer < 260) {
+                z._nextSpit = now + 1500 + Math.random() * 900;
+                this._zombieSpitFire(z, distToPlayer);
+            }
+        }
+    }
+
+    // A fire zombie spits a gout of flaming pixels toward the player. If the
+    // player is close enough to be caught in the cone (in front of it), they
+    // take half a heart. Works in both 2D and DOOM.
+    _zombieSpitFire(z, distToPlayer) {
+        const dx = this.player.x - z.x, dy = this.player.y - z.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const base = Math.atan2(dy, dx);
+        this.sounds.whoosh();
+        for (let i = 0; i < 16; i++) {
+            const a = base + (Math.random() - 0.5) * 0.55;      // ~30° cone
+            const reach = 70 + Math.random() * 150;
+            const p = this.add.image(z.x + Math.cos(a) * 16, z.y + Math.sin(a) * 16, 'fxSpark')
+                .setTint(Phaser.Utils.Array.GetRandom([0xff3b00, 0xff6a00, 0xff9500, 0xffe500]))
+                .setScale(2 + Math.random() * 2).setDepth(6)
+                .setBlendMode(Phaser.BlendModes.ADD);
+            if (this.miniMap) this.miniMap.ignore(p);
+            this.tweens.add({
+                targets: p,
+                x: z.x + Math.cos(a) * reach,
+                y: z.y + Math.sin(a) * reach,
+                alpha: 0, scale: 0.3,
+                duration: 340 + Math.random() * 180,
+                ease: 'Cubic.easeOut',
+                onComplete: () => p.destroy()
+            });
+        }
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(z.x + Math.cos(base) * 30, z.y + Math.sin(base) * 30,
+                { colors: ['#ff3b00', '#ff6a00', '#ffe500'], count: 14 });
+        }
+        // Scorch: only if the player is actually within the flame's reach.
+        if (distToPlayer < 200 && this.time.now >= this._invincibleUntil) {
+            this.damage(0.5);
+            this.cameras.main.shake(90, 0.006);
+            this._pixelBurst(this.player.x, this.player.y, {
+                colors: [0xff3b00, 0xff9500, 0xffe500],
+                count: 8, minSpeed: 60, maxSpeed: 180, gravity: 260
+            });
         }
     }
 
@@ -2037,11 +2110,11 @@ export default class MainScene extends Phaser.Scene {
             return;
         }
         // Still standing: white flash + a small splat so the hit reads.
-        const keepTint = z._big ? 0x9adf6a : 0xffffff;
+        const baseTint = z._big ? 0x9adf6a : (z._fire ? 0xff6a3d : null);
         z.setTintFill(0xffffff);
         this.time.delayedCall(90, () => {
             if (!z.active) return;
-            if (z._big) z.setTint(keepTint); else z.clearTint();
+            if (baseTint !== null) z.setTint(baseTint); else z.clearTint();
         });
         z._stunUntil = Math.max(z._stunUntil || 0, this.time.now + 160);
         this._pixelBurst(z.x, z.y, {
@@ -2382,6 +2455,19 @@ export default class MainScene extends Phaser.Scene {
 
     // ===== Ranged slash (Hollow-Knight style) =====
 
+    // Ranged is a FULL-HEALTH-only privilege: fire the slash if the player has
+    // every heart, otherwise nudge them with a throttled warning. Melee (the
+    // axe body) is unaffected and keeps working while hurt.
+    _tryFireSlash(dx, dy) {
+        if (this.health >= this.maxHealth) { this._fireSlash(dx, dy); return true; }
+        const now = this.time.now;
+        if (!this._rangedWarnAt || now - this._rangedWarnAt > 2500) {
+            this._rangedWarnAt = now;
+            this.showToast('RANGED LOCKED\nFULL HEALTH ONLY', 1400);
+        }
+        return false;
+    }
+
     // Launch a flying slash arc. 1 damage — two of these kill a regular
     // zombie; the axe itself does 2.
     _fireSlash(dx, dy) {
@@ -2577,17 +2663,19 @@ export default class MainScene extends Phaser.Scene {
     }
 
     // ===== The Cowboy =====
-    // Opt-in duel via the "cowboy?" HUD button. His art only shoots to HIS
-    // right, so he shadows the player from the LEFT, matching their Y, and
-    // snaps off fast bullets when he has the line. He paths around trees,
-    // but walks straight over hidden bombs — and pays for it.
+    // Opt-in duel via the "cowboy?" HUD button. He rides in from the EAST
+    // (right side of the world) and plays it like a gunslinger: he KEEPS his
+    // distance, backing off if the player closes in, and snipes from afar at
+    // any angle. His art faces right by default, so we flip him to always look
+    // toward the player. He paths around trees, but walks straight over hidden
+    // bombs — and pays for it.
 
     setCowboyEnabled(on) {
         this.cowboyEnabled = on;
         document.body.classList.toggle('cowboy-on', on);
         if (this._cowboyBtn) this._cowboyBtn.classList.toggle('on', on);
         if (on) {
-            this.showToast('A COWBOY RIDES IN\nFROM THE WEST...', 2600);
+            this.showToast('A COWBOY RIDES IN\nFROM THE EAST...', 2600);
             if (!this.cowboy) this._spawnCowboy();
         } else {
             if (this._cowboyRespawn) { this._cowboyRespawn.remove(); this._cowboyRespawn = null; }
@@ -2606,9 +2694,10 @@ export default class MainScene extends Phaser.Scene {
 
     _spawnCowboy() {
         if (this.cowboy) return;
-        const x = 120;
+        const x = 1880;   // rides in from the EAST — the right side of the world
         const y = Phaser.Math.Clamp(this.player.y, 120, 1880);
         const c = this.physics.add.sprite(x, y, 'cowboy', 0).setScale(3);
+        c.setFlipX(true);  // spawns east of the player, so he looks west toward them
         c.setCollideWorldBounds(true);
         c.setDepth(5);
         c._hp = this.COWBOY_HP;
@@ -2662,6 +2751,11 @@ export default class MainScene extends Phaser.Scene {
         const c = this.cowboy;
         if (!c || !c.active) return;
 
+        const dxp = this.player.x - c.x, dyp = this.player.y - c.y;
+        const distToPlayer = Math.hypot(dxp, dyp);
+        // Always look toward the player (art faces right → flip when they're west).
+        c.setFlipX(dxp < 0);
+
         // Mid quick-draw: stand still and look menacing.
         if (now < c._shootingUntil) {
             c.setVelocity(0, 0);
@@ -2669,15 +2763,22 @@ export default class MainScene extends Phaser.Scene {
             return;
         }
 
-        // Hold a firing position west of the player, matched on Y.
-        const tx = Phaser.Math.Clamp(this.player.x - 380, 80, 1920);
-        const ty = Phaser.Math.Clamp(this.player.y, 80, 1920);
+        // Gunslinger spacing: hold a standoff of STAND px, retreating along his
+        // own bearing from the player if they crowd him (he never charges in).
+        const STAND = 430;
+        let tx, ty;
+        if (distToPlayer < 1) { tx = c.x + 1; ty = c.y; }
+        else {
+            const ux = -dxp / distToPlayer, uy = -dyp / distToPlayer; // player → cowboy
+            tx = Phaser.Math.Clamp(this.player.x + ux * STAND, 80, 1920);
+            ty = Phaser.Math.Clamp(this.player.y + uy * STAND, 80, 1920);
+        }
         const dist = Phaser.Math.Distance.Between(c.x, c.y, tx, ty);
-        if (dist > 40) {
+        if (dist > 60) {
             if (this._navDirty) this._buildNavGrid();
             if (now >= c._nextRepath) {
                 c._path = this._findPath(c.x, c.y, tx, ty);
-                c._nextRepath = now + 650 + Math.random() * 300;
+                c._nextRepath = now + 500 + Math.random() * 250;
             }
             let wx = tx, wy = ty;
             if (c._path && c._path.length) {
@@ -2687,22 +2788,20 @@ export default class MainScene extends Phaser.Scene {
                 if (c._path.length) { wx = c._path[0].x; wy = c._path[0].y; }
             }
             const ang = Math.atan2(wy - c.y, wx - c.x);
-            const sp = 130;
+            // Backpedal faster than he closes so the player can't corner him.
+            const sp = distToPlayer < STAND - 40 ? 175 : 130;
             c.setVelocity(Math.cos(ang) * sp, Math.sin(ang) * sp);
-            c.setFlipX(c.body.velocity.x < -10);
             c.anims.play('cowboy-walk', true);
         } else {
             c.setVelocity(0, 0);
-            c.setFlipX(false);   // face the player (he's east of us)
             c.anims.play('cowboy-idle', true);
         }
 
-        // Take the shot when the player is off to his right and roughly level.
-        if (now >= c._nextShot
-            && this.player.x > c.x + 80
-            && Math.abs(this.player.y - c.y) < 70) {
+        // Snipe from afar: fire whenever he's reloaded and the player is in range,
+        // at any angle (the shot itself aims straight at the player).
+        if (now >= c._nextShot && distToPlayer < 900) {
             this._cowboyShoot();
-            c._nextShot = now + 2400 + Math.random() * 2200;
+            c._nextShot = now + 1900 + Math.random() * 1600;
         }
     }
 
@@ -2710,22 +2809,28 @@ export default class MainScene extends Phaser.Scene {
         const c = this.cowboy;
         if (!c || !c.active) return;
         c._shootingUntil = this.time.now + 420;
-        c.setFlipX(false);
+        // Aim straight at the player, wherever they are.
+        const dx = this.player.x - c.x, dy = this.player.y - c.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const ux = dx / d, uy = dy / d;
+        c.setFlipX(dx < 0);
         c.anims.play('cowboy-shoot', true);
         this.sounds.whoosh();
-        const b = this.bulletGroup.create(c.x + 34, c.y + 4, 'fxBullet');
+        const mx = c.x + ux * 34, my = c.y + uy * 34 + 4;
+        const b = this.bulletGroup.create(mx, my, 'fxBullet');
         b.setDepth(6);
         b.body.setAllowGravity(false);
-        b.setVelocity(760, 0);
+        b.setVelocity(ux * 760, uy * 760);
+        b.setRotation(Math.atan2(uy, ux));
         b._dieAt = this.time.now + 2200;
         if (this.miniMap) this.miniMap.ignore(b);
         // Muzzle flash.
-        this._pixelBurst(c.x + 36, c.y + 4, {
+        this._pixelBurst(mx, my, {
             colors: [0xffe500, 0xff9500, 0xffffff],
             count: 8, minSpeed: 60, maxSpeed: 180, gravity: 200
         });
         if (this.doomView && this.doomView.active) {
-            this.doomView.burstAtWorld(c.x + 36, c.y, { colors: ['#ffe500', '#ff9500'], count: 8 });
+            this.doomView.burstAtWorld(mx, my, { colors: ['#ffe500', '#ff9500'], count: 8 });
         }
     }
 

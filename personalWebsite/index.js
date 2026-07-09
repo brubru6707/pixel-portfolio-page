@@ -278,25 +278,36 @@ window.onclick = function(event) {
     window.addEventListener('resize', resize);
     resize();
 
-    // Falling drips, ported from the tutorial's 20 nth-child variants but
-    // spread across the whole viewport (fewer + no-repaint-waste on phones).
-    const COUNT = window.innerWidth < 700 ? 12 : 20;
-    const drips = [];
+    // Lava-lamp globs. Each blob slowly bobs UP and DOWN on a long sine
+    // (thermal convection), sways sideways, and squashes/stretches with the
+    // direction it's travelling — and is drawn as a little cluster of breathing
+    // sub-lobes so the merged silhouette reads as wobbling liquid, not a hard
+    // disc. The goo filter (blur + alpha threshold) fuses neighbouring globs
+    // into one flowing body.
+    //
+    // Rather than each glob traversing the whole screen and fully leaving it
+    // (which read as globs "disappearing and regenerating"), every glob now
+    // orbits a HOME position and only bobs a limited distance around it, so the
+    // field is always full and continuous. More globs + bigger radii = more goop.
+    const COUNT = window.innerWidth < 700 ? 46 : 80;
+    const COLS = window.innerWidth < 700 ? 6 : 10;
+    const blobs = [];
     for (let i = 0; i < COUNT; i++) {
-        drips.push({
-            x: (i + Math.random()) / COUNT,          // spread over the width
-            r: 6 + Math.random() * 26,               // drip radius, px
-            delay: i * 0.21 + Math.random() * 0.25,  // like the -0.2s stagger
-            dur: 4.4 + Math.random() * 1.6           // ~5s fall, like the original
+        blobs.push({
+            // Home cell, scattered over the whole screen (slight bleed past the
+            // edges so goop hugs the borders instead of stopping short of them).
+            x: -0.05 + 1.1 * ((i % COLS) + Math.random()) / COLS,
+            y: -0.05 + 1.1 * Math.random(),
+            r: 74 + Math.random() * 110,              // glob radius, px (bigger)
+            phase: Math.random() * Math.PI * 2,       // where it is in its bob
+            speed: 0.05 + Math.random() * 0.08,       // convection speed (slow!)
+            amp: 0.10 + Math.random() * 0.14,         // vertical bob amount (of H)
+            sway: 0.04 + Math.random() * 0.10,        // horizontal drift amount (of W)
+            swayPhase: Math.random() * Math.PI * 2,
+            swaySpeed: 0.09 + Math.random() * 0.14,
+            wob: Math.random() * Math.PI * 2,         // deformation phase
+            lobes: 4 + (Math.random() * 3 | 0)        // sub-lobes making up the glob
         });
-    }
-
-    // The tutorial's @keyframes falling: top -100% → 0% → 80% → 100%,
-    // as a piecewise function of loop progress p in [0,1).
-    function dripTop(p) {
-        if (p < 0.5) return -1 + p / 0.5;            // -100% → 0%
-        if (p < 0.8) return ((p - 0.5) / 0.3) * 0.8; // 0% → 80%
-        return 0.8 + ((p - 0.8) / 0.2) * 0.2;        // 80% → 100%
     }
 
     function frame(now) {
@@ -305,14 +316,30 @@ window.onclick = function(event) {
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
-        // ...with the drips punched out of it.
+        // ...with the liquid globs punched out of it.
         ctx.globalCompositeOperation = 'destination-out';
         ctx.fillStyle = '#fff';
-        for (const d of drips) {
-            const p = ((t + d.delay) / d.dur) % 1;
-            const y = dripTop(p) * H + d.r;          // enter from above the top edge
+        for (const b of blobs) {
+            const rise = b.phase + t * b.speed;
+            // Vertical convection: bobs up and down around its home row, but
+            // never wanders far enough to fully leave the screen.
+            const yc = (b.y + b.amp * Math.cos(rise)) * H;
+            const xc = (b.x + b.sway * Math.sin(b.swayPhase + t * b.swaySpeed)) * W;
+            // Elongate along travel: fastest mid-bob (sin peaks), rounder at
+            // the turnarounds — exactly how a real glob necks and pulls free.
+            const stretch = 1 + 0.22 * Math.sin(rise);
+            const N = b.lobes;
+            for (let k = 0; k < N; k++) {
+                const a = (k / N) * Math.PI * 2 + b.wob + t * 0.3;
+                const spread = b.r * (0.26 + 0.14 * Math.sin(t * 0.7 + k * 1.3 + b.wob));
+                const rr = b.r * (0.5 + 0.22 * Math.sin(t * 0.9 + k * 1.7 + b.wob));
+                ctx.beginPath();
+                ctx.arc(xc + Math.cos(a) * spread, yc + Math.sin(a) * spread * stretch, rr, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            // Solid core keeps the lobes reading as a single body.
             ctx.beginPath();
-            ctx.arc(d.x * W, y, d.r, 0, Math.PI * 2);
+            ctx.ellipse(xc, yc, b.r * 0.68, b.r * 0.68 * stretch, 0, 0, Math.PI * 2);
             ctx.fill();
         }
         ctx.globalCompositeOperation = 'source-over';

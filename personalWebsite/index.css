@@ -72,7 +72,13 @@ header{
     display: flex;
     gap: 25px;
     align-items: center;
-    margin: 0 30px;
+    /* auto side-margins center the whole link group in the header instead of
+       jamming it against the right edge, where the Resume button was getting
+       clipped off-screen. flex-wrap keeps every link (incl. Resume) reachable
+       if the row runs out of room. */
+    margin: 0 auto;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .nav-link {
@@ -870,7 +876,7 @@ body.is-mobile {
     
     #nav-menu {
         gap: 10px;
-        margin: 0 15px;
+        margin: 0 auto;
     }
     
     .nav-link {

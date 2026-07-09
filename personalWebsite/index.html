@@ -57,9 +57,12 @@
          inverted (holes in a solid), so only blur+threshold do the merging. -->
     <svg id="goop-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
       <defs>
-        <filter id="goo">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
-          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" />
+        <!-- Generous filter region: the default is only -10%..110%, which hard-
+             clips the blurred goop near the screen edges. Widen it so drips can
+             blur/merge past the edges without a visible cut-off line. -->
+        <filter id="goo" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="13" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" />
         </filter>
       </defs>
     </svg>
