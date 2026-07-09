@@ -427,7 +427,7 @@ export default class MainScene extends Phaser.Scene {
         // They phase straight through trees, planks, zombies, everything — the
         // player is the one and only thing his lead can touch.
         this.bulletGroup = this.physics.add.group();
-        this.physics.add.overlap(this.bulletGroup, this.player, this._bulletHitsPlayer, null, this);
+        this.physics.add.overlap(this.player, this.bulletGroup, this._bulletHitsPlayer, null, this);
 
         // Keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -2834,7 +2834,10 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
-    _bulletHitsPlayer(b, player) {
+    // Phaser always calls overlap callbacks with the single game object
+    // first and the group member second, regardless of the order they're
+    // passed to physics.add.overlap() — so `player` comes first here.
+    _bulletHitsPlayer(player, b) {
         if (!b.active) return;
         this._popBullet(b);
         if (this.time.now < this._invincibleUntil) return;
