@@ -387,13 +387,18 @@
             background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><rect x='1' y='6' width='2' height='4' fill='%23888'/><rect x='3' y='5' width='2' height='6' fill='%23888'/><rect x='5' y='4' width='2' height='8' fill='%23888'/><rect x='7' y='2' width='2' height='12' fill='%23888'/><rect x='10' y='4' width='2' height='2' fill='%23ff5555'/><rect x='14' y='4' width='2' height='2' fill='%23ff5555'/><rect x='12' y='6' width='2' height='2' fill='%23ff5555'/><rect x='10' y='8' width='2' height='2' fill='%23ff5555'/><rect x='14' y='8' width='2' height='2' fill='%23ff5555'/></svg>");
         }
 
-        /* Presence-server status — top-left, passive readout (not a button) of
-           the live WebSocket connection to the EC2 presence server. */
-        #server-status {
+        /* Top-left HUD stack — presence-server status + live FPS readout,
+           side by side so neither shifts the other around as its text changes. */
+        #topleft-hud {
             position: fixed;
             top: 24px;
             left: 20px;
             z-index: 1500;
+            display: flex;
+            gap: 8px;
+            pointer-events: none;
+        }
+        #server-status, #fps-counter {
             font-family: 'Press Start 2P', monospace;
             font-size: 10px;
             padding: 8px 12px;
@@ -408,6 +413,20 @@
             color: #c6ff33;
         }
         #server-status.inactive {
+            border-color: #ff5555;
+            color: #ff5555;
+        }
+        /* FPS counter: green >=50, yellow 30-49, red <30 — same thresholds a
+           browser devtools FPS meter uses. */
+        #fps-counter.good {
+            border-color: #c6ff33;
+            color: #c6ff33;
+        }
+        #fps-counter.warn {
+            border-color: #ffcc33;
+            color: #ffcc33;
+        }
+        #fps-counter.bad {
             border-color: #ff5555;
             color: #ff5555;
         }
@@ -648,7 +667,7 @@
         body.subpage-open #plank-hud,     body.modal-open #plank-hud,
         body.subpage-open #extra-btns,    body.modal-open #extra-btns,
         body.subpage-open #exit-btn,      body.modal-open #exit-btn,
-        body.subpage-open #server-status, body.modal-open #server-status,
+        body.subpage-open #topleft-hud,   body.modal-open #topleft-hud,
         body.subpage-open #stats-hud,     body.modal-open #stats-hud,
         body.subpage-open #sfx-btn,       body.modal-open #sfx-btn,
         body.subpage-open #music-btn,     body.modal-open #music-btn {
@@ -665,7 +684,7 @@
         body:not(.hud-ready) #zscore-hud,
         body:not(.hud-ready) #cscore-hud,
         body:not(.hud-ready) #plank-hud,
-        body:not(.hud-ready) #server-status,
+        body:not(.hud-ready) #topleft-hud,
         body:not(.hud-ready) #stats-hud,
         body:not(.hud-ready) #help-btn { display: none; }
 

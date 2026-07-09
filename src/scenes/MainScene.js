@@ -731,14 +731,26 @@ export default class MainScene extends Phaser.Scene {
         document.body.appendChild(extra);
         this._hudEls.push(extra);
 
-        // --- Presence-server status, top-left. Not a button — a passive
-        // readout of NetworkManager's live WebSocket connection state. ---
+        // --- Top-left HUD: presence-server status + live FPS readout,
+        // side by side so one's text length never nudges the other. ---
+        const topleft = document.createElement('div');
+        topleft.id = 'topleft-hud';
+
         const srv = document.createElement('div');
         srv.id = 'server-status';
         srv.textContent = 'server: inactive';
-        document.body.appendChild(srv);
+        topleft.appendChild(srv);
         this._serverStatusEl = srv;
-        this._hudEls.push(srv);
+
+        const fps = document.createElement('div');
+        fps.id = 'fps-counter';
+        fps.textContent = 'fps: --';
+        topleft.appendChild(fps);
+        this._fpsEl = fps;
+        this._fpsUpdateAt = 0;
+
+        document.body.appendChild(topleft);
+        this._hudEls.push(topleft);
 
         // --- Rolling 24h unique-visitor chart, top-right under the hearts,
         // left of the minimap. Polls server/index.js's GET /stats. ---
@@ -1367,6 +1379,18 @@ export default class MainScene extends Phaser.Scene {
     }
 
     update() {
+        // Live FPS readout, top-left next to the server status. Throttled to
+        // 4x/sec — the raw per-frame number jitters too much to read.
+        const nowMs = this.time.now;
+        if (this._fpsEl && nowMs - this._fpsUpdateAt > 250) {
+            this._fpsUpdateAt = nowMs;
+            const fps = Math.round(this.game.loop.actualFps);
+            this._fpsEl.textContent = `fps: ${fps}`;
+            this._fpsEl.classList.toggle('good', fps >= 50);
+            this._fpsEl.classList.toggle('warn', fps < 50 && fps >= 30);
+            this._fpsEl.classList.toggle('bad', fps < 30);
+        }
+
         // Tool hotkeys work in every mode: 1 = axe, 2 = plank.
         if (this.keyOne && Phaser.Input.Keyboard.JustDown(this.keyOne)) this.setTool('axe');
         if (this.keyTwo && Phaser.Input.Keyboard.JustDown(this.keyTwo)) this.setTool('plank');
@@ -3317,15 +3341,15 @@ export default class MainScene extends Phaser.Scene {
         document.body.classList.add('subpage-open'); // hides world previews + mode toggle via CSS
         document.body.style.overflow = 'hidden';
 
-        const iframe = document.createElement('iframe');
-        iframe.id = 'subPageFrame';
-        iframe.className = 'subpage-frame';
-        iframe.src = url;
+        const el = document.createElement('iframe');
+        el.id = 'subPageFrame';
+        el.className = 'subpage-frame';
+        el.src = url;
         // Always scrollable — the personal site is a tall page. (It used to be
         // locked via a 'DISABLE INTERACTION' message, which is why it wouldn't
         // scroll; we no longer send that.)
-        iframe.setAttribute('scrolling', 'yes');
-        document.body.appendChild(iframe);
+        el.setAttribute('scrolling', 'yes');
+        document.body.appendChild(el);
 
         // Single, clean pixel "BACK" button (replaces the old esc-key image and
         // the personal site's own duplicate esc button — we no longer trigger
@@ -3338,15 +3362,15 @@ export default class MainScene extends Phaser.Scene {
         escButton.addEventListener('click', () => this.closeSubPage());
         document.body.appendChild(escButton);
 
-        this.activeSubPage = { iframe, escButton, ghost };
+        this.activeSubPage = { el, escButton, ghost };
     }
 
     closeSubPage() {
         if (!this.activeSubPage) return;
-        const { iframe, escButton, ghost } = this.activeSubPage;
+        const { el, escButton, ghost } = this.activeSubPage;
         this.activeSubPage = null;
 
-        iframe.remove();
+        el.remove();
         escButton.remove();
         document.body.classList.remove('subpage-open');
         document.body.style.overflow = 'hidden';

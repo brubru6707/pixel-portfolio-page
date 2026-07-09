@@ -270,10 +270,17 @@ window.onclick = function(event) {
     if (!canvas || !canvas.getContext) return;
     const ctx = canvas.getContext('2d');
 
+    // Rendered at half resolution and upscaled by the CSS box (canvas is
+    // `width/height: 100vw/100vh` — the browser stretches the smaller
+    // bitmap to fit). The gooey blur filter already softens every edge, so
+    // the resolution drop is invisible but quarters the fill/arc rasterization
+    // cost per shape, which is what actually got expensive when the blob
+    // count went up — not the shape count itself.
+    const RES_SCALE = 0.5;
     let W = 0, H = 0;
     function resize() {
-        W = canvas.width = window.innerWidth;
-        H = canvas.height = window.innerHeight;
+        W = canvas.width = Math.round(window.innerWidth * RES_SCALE);
+        H = canvas.height = Math.round(window.innerHeight * RES_SCALE);
     }
     window.addEventListener('resize', resize);
     resize();
@@ -298,7 +305,7 @@ window.onclick = function(event) {
             // edges so goop hugs the borders instead of stopping short of them).
             x: -0.05 + 1.1 * ((i % COLS) + Math.random()) / COLS,
             y: -0.05 + 1.1 * Math.random(),
-            r: 74 + Math.random() * 110,              // glob radius, px (bigger)
+            r: (74 + Math.random() * 110) * RES_SCALE, // glob radius, in the (downscaled) canvas's own px
             phase: Math.random() * Math.PI * 2,       // where it is in its bob
             speed: 0.05 + Math.random() * 0.08,       // convection speed (slow!)
             amp: 0.10 + Math.random() * 0.14,         // vertical bob amount (of H)
@@ -310,7 +317,14 @@ window.onclick = function(event) {
         });
     }
 
+    // The bob/sway/wobble here is all slow (multi-second periods), so a
+    // repaint rate above ~30fps buys nothing visible — cap it to roughly
+    // halve the frame count on 60Hz+ displays.
+    const FRAME_INTERVAL_MS = 1000 / 30;
+    let lastPaint = 0;
     function frame(now) {
+        if (now - lastPaint < FRAME_INTERVAL_MS) { requestAnimationFrame(frame); return; }
+        lastPaint = now;
         const t = now / 1000;
         // Opaque cover...
         ctx.globalCompositeOperation = 'source-over';
