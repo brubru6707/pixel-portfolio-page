@@ -178,9 +178,10 @@ export default class DoomView {
     }
 
     // px,py = player world position; angle = facing (radians); entities = array
-    // of Phaser sprites to billboard; attacking = swinging the axe; moving =
-    // player is walking (drives the weapon bob).
-    render(px, py, angle, entities, attacking, moving) {
+    // of Phaser sprites to billboard; held = action button/key is down (swings
+    // the axe or fires the axe gun, depending on tool); moving = player is
+    // walking (drives the weapon bob); tool = 'axe' | 'axegun' | 'plank'.
+    render(px, py, angle, entities, held, moving, tool = 'axe') {
         if (!this.active) return;
         const ctx = this.ctx;
         const W = this.canvas.width;
@@ -282,7 +283,7 @@ export default class DoomView {
 
         // --- Held weapon (axe) at the bottom, DOOM HUD style ---
         const dt = this.scene.game.loop.delta / 1000;
-        this._drawWeapon(ctx, W, H, attacking, moving, dt);
+        this._drawWeapon(ctx, W, H, held, moving, dt, tool);
 
         // --- Crosshair ---
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
@@ -293,10 +294,15 @@ export default class DoomView {
         this._drawFx(ctx, px, py, angle, focal, horizon, W, H, dt);
     }
 
-    // Draws the axe as a held weapon that bobs while walking and swings through
-    // a chop arc while attacking — a fake-3D (2.5D) swing by rotating the sprite
-    // about the "hand" pivot at the bottom of the screen.
-    _drawWeapon(ctx, W, H, attacking, moving, dt) {
+    // Draws the currently-held weapon. The axe swings through a chop arc
+    // while held (a fake-3D/2.5D swing rotated about the "hand" pivot); the
+    // axe gun instead jitters with rapid recoil while firing, since it's
+    // sprayed, not swung. `held` also drives the plank tool's bob-only pose
+    // (no attack animation of its own — the axe icon just idles there).
+    _drawWeapon(ctx, W, H, held, moving, dt, tool) {
+        if (tool === 'axegun') { this._drawAxeGun(ctx, W, H, held, moving, dt); return; }
+
+        const attacking = held; // axe (and plank, which reuses the idle axe pose)
         if (!this.scene.textures.exists('axe')) return;
         const frame = this.scene.textures.getFrame('axe', 0);
         if (!frame) return;
@@ -340,6 +346,49 @@ export default class DoomView {
         ctx.translate(handX, handY);
         ctx.rotate(rot);
         ctx.scale(-1, 1); // mirror the axe across its Y axis (3D held-weapon flip)
+        ctx.drawImage(
+            src, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
+            -wpnW * 0.5, -wpnH, wpnW, wpnH
+        );
+        ctx.restore();
+    }
+
+    // Axe gun: bobs while walking same as the axe, but instead of a wind-up
+    // swing arc it does fast, small, chaotic recoil kicks while firing —
+    // reads as a spray, not a single chop.
+    _drawAxeGun(ctx, W, H, firing, moving, dt) {
+        if (!this.scene.textures.exists('axeGun')) return;
+        const frame = this.scene.textures.getFrame('axeGun');
+        if (!frame) return;
+        const src = frame.texture.getSourceImage();
+
+        // Frame is 30x20 (wider/shorter than the axe's 12x15) — scale it so
+        // it reads at roughly the same on-screen size as the held axe.
+        const scale = Math.max(4, W / 80);
+        const wpnW = frame.cutWidth * scale;
+        const wpnH = frame.cutHeight * scale;
+
+        this.bobPhase += dt * (moving ? 9 : 4);
+        const bobAmp = moving ? 1 : 0;
+        const bobX = Math.cos(this.bobPhase) * wpnW * 0.06 * bobAmp;
+        const bobY = Math.abs(Math.sin(this.bobPhase)) * wpnH * 0.05 * bobAmp;
+
+        let kickX = 0, kickY = 0;
+        if (firing) {
+            this.gunRecoilPhase = (this.gunRecoilPhase || 0) + dt * 40;
+            kickX = Math.sin(this.gunRecoilPhase * 1.7) * wpnW * 0.06;
+            kickY = -Math.abs(Math.sin(this.gunRecoilPhase)) * wpnH * 0.14;
+        } else {
+            this.gunRecoilPhase = 0;
+        }
+
+        // Bottom-anchored pivot, same as the axe.
+        const handX = W * 0.7 + bobX + kickX;
+        const handY = H + bobY + kickY;
+
+        ctx.save();
+        ctx.translate(handX, handY);
+        ctx.scale(-1, 1); // mirror to match the axe's held-weapon flip
         ctx.drawImage(
             src, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
             -wpnW * 0.5, -wpnH, wpnW, wpnH

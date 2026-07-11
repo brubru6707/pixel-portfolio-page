@@ -29,6 +29,27 @@ export default class MainScene extends Phaser.Scene {
         this.acceleration = 15;
         this.maxSpeed = 200;
         this.friction = 0.9;
+
+        // Dash — double-tap the direction key you're already holding to burst
+        // a few blocks that way. 1s cooldown from the moment it triggers.
+        this._dashKeyDownAt = { left: 0, right: 0, up: 0, down: 0 }; // last press time per direction
+        this._dashDir = null;
+        this._dashUntil = 0;          // time.now until which the dash owns velocity
+        this._dashCooldownUntil = 0;
+        this._dashTrailAt = 0;
+        this.DASH_WINDOW = 280;       // ms between taps to count as a double-tap
+        this.DASH_DURATION = 190;     // ms the dash burst lasts
+        this.DASH_SPEED = 900;        // px/s during the burst
+        this.DASH_COOLDOWN = 1000;    // ms before another dash can trigger
+        // Dash shield: a barrier that rides in front of the player for the
+        // dash's duration, knocking back (once each) any zombie/cowboy caught
+        // in the cone ahead.
+        this._dashShield = null;
+        this._dashHitSet = new Set();
+        this.DASH_SHIELD_RANGE = 100;      // px — how far ahead the cone reaches
+        this.DASH_SHIELD_HALF_ANGLE = 1.0; // radians (~57°) half-angle of the cone
+        this.DASH_KNOCKBACK_SPEED = 1700;  // px/s applied to whatever gets hit
+        this.DASH_KNOCKBACK_STUN = 700;    // ms the launch + stun lasts
         this.orbActivated = false;
         this.touchTarget = { x: 0, y: 0 };
         this.movementTimer = null;
@@ -88,12 +109,19 @@ export default class MainScene extends Phaser.Scene {
         this._toastTimer = null;
 
         // Tool + plank inventory: every 3 chopped trees bank 1 plank. Key 1 =
-        // axe, key 2 = plank (or tap the plank HUD chip on touch). Placed
-        // planks wall zombies off; zombies chew through them over time.
+        // axe, key 2 = axe gun, key 3 = plank (or tap the matching HUD chip on
+        // touch). Placed planks wall zombies off; zombies chew through them
+        // over time.
         this.tool = 'axe';
         this.planks = 0;
         this._treesTowardPlank = 0;
         this._actionWasDown = false;   // edge detector for one-per-press placement
+
+        // Axe gun — rapid-fire ranged tool, 1/4 the axe's melee damage per
+        // hit but fires continuously while held (roughly matches the axe's
+        // sustained DPS as a spray instead of a swing).
+        this.AXEGUN_FIRE_RATE = 110;   // ms between shots while held
+        this._lastAxeGunShot = 0;
 
         // Zenith frenzy — every 5 zombie kills: 3s of Terraria-Zenith flying
         // axes, double speed, gold trail, rainbow flurries, invincibility.
@@ -153,6 +181,7 @@ export default class MainScene extends Phaser.Scene {
         this.load.image('brown-university', 'assets/brown-university.png');
         this.load.image('tree', 'assets/tree.png');
         this.load.spritesheet('axe', 'assets/axe.png', { frameWidth: 12, frameHeight: 15 });
+        this.load.image('axeGun', 'assets/axe-gun.png');
         this.load.spritesheet('computer', 'assets/computer.png', { frameWidth: 30, frameHeight: 26 });
         this.load.image('plank', 'assets/plank.png');
         this.load.spritesheet('orb', 'assets/orb.png', { frameWidth: 26, frameHeight: 30 });
@@ -210,6 +239,10 @@ export default class MainScene extends Phaser.Scene {
         this.player.setCollideWorldBounds(true);
         this.axe = this.physics.add.sprite(0, 0, 'axe', 0).setVisible(false).setScale(5).refreshBody();
         this.axe.body.enable = false; // only active mid-swing, so hidden axe can't chop things
+        // Held axe-gun icon (2D only — DOOM mode draws its own screen-space
+        // copy in DoomView). Purely visual, no physics/hitbox of its own; the
+        // actual damage comes from the axeGunGroup projectiles.
+        this.axeGunIcon = this.add.image(0, 0, 'axeGun').setVisible(false).setDepth(20).setScale(2.4);
         // Scatter hidden bombs across the field. Touch one and it blows a
         // heart + launches the player (see triggerExplosion). Kept clear of the
         // player's spawn / the central computer so you don't blow up instantly.
@@ -229,6 +262,7 @@ export default class MainScene extends Phaser.Scene {
             miniMapWidth,
             miniMapWidth
         ).setZoom(0.1).startFollow(this.player, true, 0.1, 0.1).setBackgroundColor(0x002244).setBounds(0, 0, worldWidth, worldHeight);
+        this.miniMap.ignore(this.axeGunIcon);
 
         // Right-click must do NOTHING (it used to lock the axe + walk target):
         // kill the browser context menu and gate every pointer handler below
@@ -410,9 +444,16 @@ export default class MainScene extends Phaser.Scene {
         // Fired with every swing; 2 hits kill a regular zombie.
         this.slashGroup = this.physics.add.group();
         this.physics.add.overlap(this.slashGroup, this.zombieGroup, this._slashHitsZombie, null, this);
-        // Slashes splash against trees + planks instead of flying through.
+        // Slashes splash against trees, but fly clean through planks — planks
+        // are the player's cover, not a wall against their own shots.
         this.physics.add.overlap(this.slashGroup, this.trees, (s) => this._popSlash(s), null, this);
-        this.physics.add.overlap(this.slashGroup, this.plankGroup, (s) => this._popSlash(s), null, this);
+
+        // --- Axe gun (rapid-fire tumbling-hatchet projectiles) ---
+        // Tool 2. 1/4 the axe's melee damage per hit, but fired continuously.
+        // Same plank rule as the slash: player shots fly clean through cover.
+        this.axeGunGroup = this.physics.add.group();
+        this.physics.add.overlap(this.axeGunGroup, this.zombieGroup, this._axeGunHitsZombie, null, this);
+        this.physics.add.overlap(this.axeGunGroup, this.trees, (a) => this._popAxeGun(a), null, this);
 
         // --- Half-heart pickups (rare) ---
         this.heartPickups = this.physics.add.group();
@@ -424,10 +465,11 @@ export default class MainScene extends Phaser.Scene {
         });
 
         // --- Cowboy bullets (he shoots them; ONLY the player eats them) ---
-        // They phase straight through trees, planks, zombies, everything — the
-        // player is the one and only thing his lead can touch.
+        // They phase straight through trees, zombies, everything else — but a
+        // planted plank is cover, so bullets stop dead against those.
         this.bulletGroup = this.physics.add.group();
         this.physics.add.overlap(this.player, this.bulletGroup, this._bulletHitsPlayer, null, this);
+        this.physics.add.overlap(this.bulletGroup, this.plankGroup, (b) => this._popBullet(b), null, this);
 
         // Keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -438,9 +480,10 @@ export default class MainScene extends Phaser.Scene {
             D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
         };
         downF = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
-        // 1 = axe, 2 = plank (tool switch).
+        // 1 = axe, 2 = axe gun, 3 = plank (tool switch).
         this.keyOne = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
         this.keyTwo = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
+        this.keyThree = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE);
 
         // Show instructions at the center of the screen, scaled to fit small screens
         const instrSource = this.textures.get('instructions').getSourceImage();
@@ -773,12 +816,33 @@ export default class MainScene extends Phaser.Scene {
         this._heartsHud = hearts;
         this._hudEls.push(hearts);
 
-        // --- Plank tool chip: shows the plank count AND switches tools.
-        // Keyboard: 1 = axe, 2 = plank. Touch: tap the chip to toggle. ---
+        // --- Tool row: three chips (axe / axe gun / plank), one tap each to
+        // switch straight to that tool. Keyboard: 1 / 2 / 3 do the same. ---
+        const toolRow = document.createElement('div');
+        toolRow.id = 'tool-hud';
+
+        const axeTool = document.createElement('button');
+        axeTool.id = 'axe-tool-btn';
+        axeTool.className = 'pixel-hud-btn';
+        axeTool.setAttribute('aria-label', 'Switch to the axe (1)');
+        axeTool.innerHTML = '<span class="axe-icon"></span>';
+        axeTool.addEventListener('click', () => this.setTool('axe'));
+        toolRow.appendChild(axeTool);
+        this._axeToolBtn = axeTool;
+
+        const gunTool = document.createElement('button');
+        gunTool.id = 'axegun-tool-btn';
+        gunTool.className = 'pixel-hud-btn';
+        gunTool.setAttribute('aria-label', 'Switch to the axe gun (2)');
+        gunTool.innerHTML = '<span class="axegun-icon"></span>';
+        gunTool.addEventListener('click', () => this.setTool('axegun'));
+        toolRow.appendChild(gunTool);
+        this._axeGunToolBtn = gunTool;
+
         const plank = document.createElement('button');
-        plank.id = 'plank-hud';
+        plank.id = 'plank-tool-btn';
         plank.className = 'pixel-hud-btn';
-        plank.setAttribute('aria-label', 'Switch between axe (1) and plank (2)');
+        plank.setAttribute('aria-label', 'Switch to planks (3)');
         const plankIcon = document.createElement('div');
         plankIcon.className = 'plank-icon';
         const plankVal = document.createElement('span');
@@ -786,11 +850,15 @@ export default class MainScene extends Phaser.Scene {
         plankVal.textContent = this.planks;
         plank.appendChild(plankIcon);
         plank.appendChild(plankVal);
-        plank.addEventListener('click', () => this.setTool(this.tool === 'plank' ? 'axe' : 'plank'));
-        document.body.appendChild(plank);
+        plank.addEventListener('click', () => this.setTool('plank'));
+        toolRow.appendChild(plank);
         this._plankHud = plank;
         this._plankVal = plankVal;
-        this._hudEls.push(plank);
+
+        document.body.appendChild(toolRow);
+        this._toolHud = toolRow;
+        this._hudEls.push(toolRow);
+        this._updateToolHud();
 
         // --- Tree-cut score (persisted in localStorage), left of the hearts ---
         const score = document.createElement('div');
@@ -1196,17 +1264,189 @@ export default class MainScene extends Phaser.Scene {
         this._statsTotalEl.textContent = `total users (24h): ${totalUnique24h}`;
     }
 
+    // ===== Dash =====
+    // Double-tap whichever movement key you're already on (WASD or arrows,
+    // either scheme, mixed freely) to burst a few blocks that way. Works in
+    // both top-down and DOOM mode; 1s cooldown from the moment it fires.
+
+    // Watches all 8 movement keys for a same-direction double-press within
+    // DASH_WINDOW ms and kicks off a dash if the cooldown's clear.
+    _pollDashInput() {
+        const now = this.time.now;
+        const check = (justDown, dir) => {
+            if (!justDown) return;
+            if (now - (this._dashKeyDownAt[dir] || 0) <= this.DASH_WINDOW && now >= this._dashCooldownUntil) {
+                this._startDash(dir);
+            }
+            this._dashKeyDownAt[dir] = now;
+        };
+        check(Phaser.Input.Keyboard.JustDown(this.cursors.left) || Phaser.Input.Keyboard.JustDown(this.wasd.A), 'left');
+        check(Phaser.Input.Keyboard.JustDown(this.cursors.right) || Phaser.Input.Keyboard.JustDown(this.wasd.D), 'right');
+        check(Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.wasd.W), 'up');
+        check(Phaser.Input.Keyboard.JustDown(this.cursors.down) || Phaser.Input.Keyboard.JustDown(this.wasd.S), 'down');
+    }
+
+    _startDash(dir) {
+        const now = this.time.now;
+        this._dashDir = dir;
+        this._dashUntil = now + this.DASH_DURATION;
+        this._dashCooldownUntil = now + this.DASH_COOLDOWN;
+        this._dashTrailAt = 0;
+        this._dashHitSet = new Set(); // enemies already shield-knocked this dash
+        if (!this.is3D) this.lastDirection = dir;
+        this.sounds.dash();
+        this.cameras.main.shake(60, 0.003);
+        this._pixelBurst(this.player.x, this.player.y, {
+            colors: [0xc6ff33, 0xffffff, 0x8fd424],
+            count: 14, minSpeed: 40, maxSpeed: 160, gravity: 0, life: 260
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(this.player.x, this.player.y, { colors: ['#c6ff33', '#ffffff'], count: 10 });
+        }
+    }
+
+    // {vx, vy, angle} while a dash is active, else null. In DOOM mode the
+    // dash rides the facing angle (up=forward, down=backward, left/right=
+    // strafe) instead of fixed screen axes, since that's what those keys
+    // actually do there. `angle` drives the dash shield's facing (below).
+    _dashVelocity() {
+        if (this.time.now >= this._dashUntil) return null;
+        let angle;
+        if (this.is3D) {
+            const offset = { up: 0, down: Math.PI, left: -Math.PI / 2, right: Math.PI / 2 }[this._dashDir] || 0;
+            angle = this.doomAngle + offset;
+        } else {
+            angle = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2 }[this._dashDir] ?? 0;
+        }
+        return { vx: Math.cos(angle) * this.DASH_SPEED, vy: Math.sin(angle) * this.DASH_SPEED, angle };
+    }
+
+    // Ghostly copy of the player left behind every ~40ms of a dash — cheap
+    // motion-trail juice using a tweened image sprite (Phaser particles don't
+    // render in this scene, see the burst helpers elsewhere).
+    _spawnDashAfterimage() {
+        try {
+            const p = this.player;
+            const img = this.add.image(p.x, p.y, p.texture.key, p.frame.name)
+                .setScale(p.scaleX, p.scaleY)
+                .setFlipX(p.flipX)
+                .setAlpha(0.45)
+                .setTint(0xc6ff33)
+                .setDepth(p.depth - 1)
+                .setBlendMode(Phaser.BlendModes.ADD);
+            if (this.miniMap) this.miniMap.ignore(img);
+            this.tweens.add({ targets: img, alpha: 0, duration: 220, onComplete: () => img.destroy() });
+        } catch (e) {
+            console.error('dash afterimage failed (non-fatal):', e);
+        }
+    }
+
+    // Rides in front of the player for as long as the dash lasts: keeps the
+    // shield sprite glued to the dash direction, and knocks back (once each)
+    // any zombie/cowboy caught in the cone ahead. Called every frame the dash
+    // owns velocity, in both top-down and DOOM movement.
+    _updateDashShield(angle) {
+        // Defensive: this runs every frame of every dash, so any exception in
+        // here (bad enemy state, a destroyed sprite slipping through, etc.)
+        // would otherwise abort the rest of that frame's update() BEFORE
+        // rendering ever runs — which reads as the whole game freezing, since
+        // it recurs every subsequent frame too. Fail loud in the console, but
+        // never let this block movement or rendering from continuing.
+        try {
+            const sx = this.player.x + Math.cos(angle) * 34;
+            const sy = this.player.y + Math.sin(angle) * 34;
+            if (!this._dashShield) {
+                this._dashShield = this.add.image(sx, sy, 'fxShield')
+                    .setDepth(16000).setBlendMode(Phaser.BlendModes.ADD);
+                if (this.miniMap) this.miniMap.ignore(this._dashShield);
+            }
+            this._dashShield.setPosition(sx, sy).setRotation(angle).setVisible(true).setAlpha(0.85).setScale(1.2);
+
+            const foes = [...this.zombies];
+            if (this.cowboy && this.cowboy.active) foes.push(this.cowboy);
+            for (const foe of foes) {
+                if (!foe || !foe.active || !foe.body || this._dashHitSet.has(foe)) continue;
+                const dx = foe.x - this.player.x, dy = foe.y - this.player.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > this.DASH_SHIELD_RANGE) continue;
+                const rawRel = Math.atan2(dy, dx) - angle;
+                const rel = Math.atan2(Math.sin(rawRel), Math.cos(rawRel)); // wrap to [-PI, PI]
+                if (Math.abs(rel) > this.DASH_SHIELD_HALF_ANGLE) continue;
+                this._dashHitSet.add(foe);
+                this._dashKnockback(foe, angle);
+            }
+        } catch (e) {
+            console.error('dash shield update failed (non-fatal, skipping this frame):', e);
+        }
+    }
+
+    // Shoves a shield-struck enemy away along the dash direction and stuns
+    // it briefly so it doesn't just walk straight back into you.
+    _dashKnockback(foe, angle) {
+        foe.setVelocity(Math.cos(angle) * this.DASH_KNOCKBACK_SPEED, Math.sin(angle) * this.DASH_KNOCKBACK_SPEED);
+        foe._stunUntil = Math.max(foe._stunUntil || 0, this.time.now + this.DASH_KNOCKBACK_STUN);
+        this.sounds.smash();
+        this.cameras.main.shake(160, 0.01);
+        this._pixelBurst(foe.x, foe.y, {
+            colors: [0xc6ff33, 0xffffff, 0x8fd424],
+            count: 24, minSpeed: 180, maxSpeed: 420, gravity: 300
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(foe.x, foe.y, { colors: ['#c6ff33', '#ffffff', '#8fd424'], count: 20 });
+        }
+    }
+
+    // Dash ended (or never started this frame) — fade out + clean up the
+    // shield sprite if one's still hanging around. Safe to call every frame;
+    // no-ops once the sprite's gone.
+    _endDashShield() {
+        if (!this._dashShield) return;
+        const s = this._dashShield;
+        this._dashShield = null;
+        try {
+            this.tweens.add({
+                targets: s,
+                alpha: 0, scaleX: s.scaleX + 0.5, scaleY: s.scaleY + 0.5,
+                duration: 160,
+                onComplete: () => s.destroy()
+            });
+        } catch (e) {
+            console.error('dash shield cleanup failed (non-fatal):', e);
+            if (s.destroy) s.destroy();
+        }
+    }
+
     // First-person controls: left/right turn, forward/back walk along the facing
     // direction. Runs instead of the top-down movement while in DOOM mode.
     updateDoomMovement() {
         const s = this.doomView.settings;
         const dt = this.game.loop.delta / 1000;
 
+        // Poll dash input BEFORE the knockback early-return below — otherwise a
+        // bomb/zombie-bite knockback landing at the exact moment of a double-tap
+        // would silently eat the keypress (JustDown only fires once and is gone
+        // next frame). Polling here just records the double-tap; actual dash
+        // movement still can't override an in-progress knockback.
+        this._pollDashInput();
+
         // Bomb knockback owns movement while it's sliding out (see triggerExplosion).
         if (this.time.now < this._knockbackUntil) {
             this.player.setVelocity(this.player.body.velocity.x * 0.92, this.player.body.velocity.y * 0.92);
             return;
         }
+
+        const dashVel = this._dashVelocity();
+        if (dashVel) {
+            this.player.setVelocity(dashVel.vx, dashVel.vy);
+            this._updateDashShield(dashVel.angle);
+            if (this.time.now - this._dashTrailAt > 40) {
+                this._dashTrailAt = this.time.now;
+                this._spawnDashAfterimage();
+            }
+            return;
+        }
+        this._endDashShield();
+
         // Keyboard OR the on-screen D-pad (mobile) drive first-person movement.
         const left = this.cursors.left.isDown || this.wasd.A.isDown || this.doomInput.left;
         const right = this.cursors.right.isDown || this.wasd.D.isDown || this.doomInput.right;
@@ -1245,6 +1485,7 @@ export default class MainScene extends Phaser.Scene {
         if (this.tool === 'plank' && actionDown && !this._actionWasDown) this._placePlank();
         this._actionWasDown = actionDown;
         const attacking = actionDown && this.tool === 'axe';
+        const gunning = actionDown && this.tool === 'axegun';
         if (attacking) {
             const reach = 46;
             this.axe.setPosition(this.player.x + Math.cos(this.doomAngle) * reach, this.player.y + Math.sin(this.doomAngle) * reach);
@@ -1263,7 +1504,16 @@ export default class MainScene extends Phaser.Scene {
         }
         this.axeWasActive = attacking;
 
-        this.doomView.render(this.player.x, this.player.y, this.doomAngle, this._doomEntities(), attacking, speedMag > 40);
+        if (gunning) {
+            const now = this.time.now;
+            if (now - this._lastAxeGunShot >= this.AXEGUN_FIRE_RATE) {
+                this._lastAxeGunShot = now;
+                this.sounds.whoosh();
+                this._fireAxeGun(Math.cos(this.doomAngle), Math.sin(this.doomAngle));
+            }
+        }
+
+        this.doomView.render(this.player.x, this.player.y, this.doomAngle, this._doomEntities(), actionDown, speedMag > 40, this.tool);
 
         // Pulse the ⚔ button when something choppable is close in front.
         const cosA = Math.cos(this.doomAngle);
@@ -1391,9 +1641,10 @@ export default class MainScene extends Phaser.Scene {
             this._fpsEl.classList.toggle('bad', fps < 30);
         }
 
-        // Tool hotkeys work in every mode: 1 = axe, 2 = plank.
+        // Tool hotkeys work in every mode: 1 = axe, 2 = axe gun, 3 = plank.
         if (this.keyOne && Phaser.Input.Keyboard.JustDown(this.keyOne)) this.setTool('axe');
-        if (this.keyTwo && Phaser.Input.Keyboard.JustDown(this.keyTwo)) this.setTool('plank');
+        if (this.keyTwo && Phaser.Input.Keyboard.JustDown(this.keyTwo)) this.setTool('axegun');
+        if (this.keyThree && Phaser.Input.Keyboard.JustDown(this.keyThree)) this.setTool('plank');
         this._updateZenith();
         this._updateCowboy();
 
@@ -1447,12 +1698,36 @@ export default class MainScene extends Phaser.Scene {
         // them before the knockback early-return below.
         this._updateZombies();
 
+        // Poll dash input BEFORE the knockback early-return below — otherwise a
+        // bomb/zombie-bite knockback landing at the exact moment of a double-tap
+        // would silently eat the keypress (JustDown only fires once and is gone
+        // next frame). Polling here just records the double-tap; actual dash
+        // movement still can't override an in-progress knockback.
+        this._pollDashInput();
+
         // Bomb knockback: slide with the launch velocity, bleeding it off each
         // frame, and ignore movement input until it dies down.
         if (this.time.now < this._knockbackUntil) {
             this.player.setVelocity(this.player.body.velocity.x * 0.92, this.player.body.velocity.y * 0.92);
             return;
         }
+
+        // Dash: double-tap the direction you're already holding to burst a
+        // few blocks that way (1s cooldown). Owns velocity + animation for
+        // its short duration, same pattern as the knockback slide above.
+        const dashVel = this._dashVelocity();
+        if (dashVel) {
+            this.player.setVelocity(dashVel.vx, dashVel.vy);
+            this._updateDashShield(dashVel.angle);
+            const dashAnim = { left: 'left-me', right: 'right-me', up: 'up-me', down: 'down-me' }[this.lastDirection];
+            player.play(dashAnim || 'idle-me', true);
+            if (this.time.now - this._dashTrailAt > 40) {
+                this._dashTrailAt = this.time.now;
+                this._spawnDashAfterimage();
+            }
+            return;
+        }
+        this._endDashShield();
 
         // Player Movement — tap-to-move on touch, keys otherwise. Chopping is
         // now the dedicated on-screen ⚔ button, so movement no longer has to
@@ -1625,6 +1900,31 @@ export default class MainScene extends Phaser.Scene {
         }
         this.axeWasActive = axeActive;
 
+        // Axe-gun aiming — twin-stick style: the held icon tracks the mouse
+        // (or, on touch, the player's last walking direction) continuously
+        // while the tool is equipped, not just while firing. Rapid fire and
+        // its recoil kick only kick in while the action button/F is held.
+        if (this.tool === 'axegun') {
+            const angle = this._axeGunAimAngle();
+            const gdx = Math.cos(angle), gdy = Math.sin(angle);
+            let firedNow = false;
+            if (actionDown) {
+                const now = this.time.now;
+                if (now - this._lastAxeGunShot >= this.AXEGUN_FIRE_RATE) {
+                    this._lastAxeGunShot = now;
+                    firedNow = true;
+                    this.sounds.whoosh();
+                    this._fireAxeGun(gdx, gdy);
+                }
+            }
+            const kick = firedNow ? Phaser.Math.Between(-3, 3) : 0;
+            this.axeGunIcon.setPosition(player.x + gdx * 22 + kick, player.y + gdy * 22 + kick);
+            this.axeGunIcon.setRotation(angle);
+            this.axeGunIcon.setVisible(true);
+        } else {
+            this.axeGunIcon.setVisible(false);
+        }
+
         // Performance display toggle
         if (Phaser.Input.Keyboard.JustDown(this.perfKey)) {
             this.showPerf = !this.showPerf;
@@ -1666,13 +1966,13 @@ export default class MainScene extends Phaser.Scene {
                 // Persist the running tree-cut total + update the HUD counter.
                 try { localStorage.setItem('treesCut', this.logs); } catch (e) {}
                 if (this._scoreVal) this._scoreVal.textContent = this.logs;
-                // Every 3 trees bank one plank (press 2 to place them).
+                // Every 3 trees bank one plank (press 3 to place them).
                 this._treesTowardPlank += 1;
                 if (this._treesTowardPlank >= 3) {
                     this._treesTowardPlank = 0;
                     this.planks += 1;
                     if (this._plankVal) this._plankVal.textContent = this.planks;
-                    if (this.planks === 1) this.showToast('+1 PLANK!\nPress 2 (or tap the plank chip) to place it', 3200);
+                    if (this.planks === 1) this.showToast('+1 PLANK!\nPress 3 (or tap the plank chip) to place it', 3200);
                 }
                 // Chopped the very last tree? The whole forest regrows.
                 if (this.trees.countActive(true) === 0) {
@@ -1767,6 +2067,32 @@ export default class MainScene extends Phaser.Scene {
             g.fillRect(8, 1, 4, 4);
             g.generateTexture('fxBullet', 12, 6);
             g.destroy();
+        }
+        // Dash shield: a chunky glowing dome, bulging to the RIGHT by default
+        // (rotated to the dash direction when spawned — same convention as
+        // fxSlash above).
+        if (!this.textures.exists('fxShield')) {
+            const sw = 100, sh = 76;
+            const tex = this.textures.createCanvas('fxShield', sw, sh);
+            const c = tex.getContext();
+            c.imageSmoothingEnabled = false;
+            const cx = sw * 0.22, cy = sh / 2, r = sh / 2 - 4;
+            c.fillStyle = 'rgba(198, 255, 51, 0.28)';
+            c.beginPath();
+            c.arc(cx, cy, r, -1.3, 1.3, false);
+            c.closePath();
+            c.fill();
+            c.strokeStyle = '#c6ff33';
+            c.lineWidth = 5;
+            c.beginPath();
+            c.arc(cx, cy, r, -1.3, 1.3, false);
+            c.stroke();
+            c.strokeStyle = '#eaffb0';
+            c.lineWidth = 2;
+            c.beginPath();
+            c.arc(cx, cy, r - 6, -1.15, 1.15, false);
+            c.stroke();
+            tex.refresh();
         }
     }
 
@@ -1997,9 +2323,17 @@ export default class MainScene extends Phaser.Scene {
         // damage on touch, slower but much harder to put down. Otherwise there's
         // a chance of a FIRE zombie: regular-sized, red-hot, and it spits a
         // cone of flame that scorches the player for half a heart from afar.
+        // Otherwise a chance of a FAST zombie: a glass cannon that outruns the
+        // player outright (230 vs the player's 200) but dies in one hit —
+        // dashing is the real answer to one of these. Otherwise a chance of an
+        // IRON HELMET zombie (Plants vs. Zombies conehead/buckethead style):
+        // regular speed and bite, but a separate armor pool absorbs hits before
+        // its own HP starts dropping — see _damageZombie for the two-stage logic.
         const big = Math.random() < 0.12;
         const fire = !big && Math.random() < 0.25;
-        const z = this.zombieGroup.create(x, y, 'zombie', 0).setScale(big ? 5.5 : 3);
+        const fast = !big && !fire && Math.random() < 0.18;
+        const helmet = !big && !fire && !fast && Math.random() < 0.2;
+        const z = this.zombieGroup.create(x, y, 'zombie', 0).setScale(big ? 5.5 : (fast ? 2.6 : 3));
         z.setCollideWorldBounds(true);
         z.setDepth(5);
         z._path = null;
@@ -2007,32 +2341,48 @@ export default class MainScene extends Phaser.Scene {
         z._stunUntil = 0;
         z._big = big;
         z._fire = fire;
+        z._fast = fast;
+        z._helmet = helmet;
         z._nextSpit = this.time.now + 1200 + Math.random() * 800;
         // Health is in SLASH units: ranged slash = 1, axe chop = 2.
         // Regular zombie: 2 (two slashes or one chop). Big: 7x that. Fire: 3.
-        z._hp = big ? 14 : (fire ? 3 : 2);
-        z._speed = big ? 60 : (fire ? 78 : 85);
+        // Fast: 1 (one-shot). Helmet: 4 armor + 2 body once the armor's gone —
+        // 6 total, more than a regular zombie but well short of a big one.
+        z._hp = big ? 14 : (fire ? 3 : (fast ? 1 : 2));
+        z._armorHp = helmet ? 4 : 0;
+        z._speed = big ? 60 : (fire ? 78 : (fast ? 230 : 85));
         if (big) z.setTint(0x9adf6a);
         else if (fire) z.setTint(0xff6a3d);
+        else if (fast) z.setTint(0xfff200);
+        else if (helmet) z.setTint(0x9aa5ad);
         z.play('down-zombie');
         this.zombies.push(z);
         // Rises out of the ground in a puff of pixels — green for the undead,
-        // ember-orange for the fire-breathers.
+        // ember-orange for the fire-breathers, electric yellow for the fast
+        // ones, gunmetal for the armored ones.
         this._pixelBurst(x, y, fire ? {
             colors: [0xff3b00, 0xff6a00, 0xff9500, 0xffe500],
             count: 18, minSpeed: 60, maxSpeed: 210, gravity: 380
+        } : fast ? {
+            colors: [0xfff200, 0xffe066, 0xccff00, 0xffffff],
+            count: 16, minSpeed: 100, maxSpeed: 300, gravity: 340
+        } : helmet ? {
+            colors: [0x9aa5ad, 0xb0b8c0, 0x707880, 0xffffff],
+            count: 16, minSpeed: 60, maxSpeed: 200, gravity: 380
         } : {
             colors: [0x4a9c2d, 0x7be04a, 0x306b1c, 0x9adf6a],
             count: big ? 30 : 14, minSpeed: 60, maxSpeed: big ? 260 : 190, gravity: 380
         });
         if (this.doomView && this.doomView.active) {
             this.doomView.burstAtWorld(x, y, {
-                colors: fire ? ['#ff3b00', '#ff6a00', '#ffe500'] : ['#4a9c2d', '#7be04a', '#306b1c'],
+                colors: fire ? ['#ff3b00', '#ff6a00', '#ffe500'] : fast ? ['#fff200', '#ffe066', '#ccff00'] : helmet ? ['#9aa5ad', '#b0b8c0', '#707880'] : ['#4a9c2d', '#7be04a', '#306b1c'],
                 count: 14
             });
         }
         if (big) this.showToast('A BIG ZOMBIE EMERGES...', 2200);
         else if (fire) this.showToast('A FIRE ZOMBIE HISSES...', 2200);
+        else if (fast) this.showToast('A FAST ZOMBIE SCREECHES...', 2200);
+        else if (helmet) this.showToast('AN IRON-HELMET ZOMBIE CLANKS IN...', 2200);
     }
 
     // Per-frame zombie brain: staggered A* re-paths toward the player, waypoint
@@ -2105,8 +2455,11 @@ export default class MainScene extends Phaser.Scene {
             this.doomView.burstAtWorld(z.x + Math.cos(base) * 30, z.y + Math.sin(base) * 30,
                 { colors: ['#ff3b00', '#ff6a00', '#ffe500'], count: 14 });
         }
-        // Scorch: only if the player is actually within the flame's reach.
-        if (distToPlayer < 200 && this.time.now >= this._invincibleUntil) {
+        // Scorch: only if the player is actually within the flame's reach AND
+        // there's no plank standing between the zombie and them — a planted
+        // plank blocks the fire breath same as it blocks bullets.
+        if (distToPlayer < 200 && this.time.now >= this._invincibleUntil
+            && !this._lineBlockedByPlank(z.x, z.y, this.player.x, this.player.y)) {
             this.damage(0.5);
             this.cameras.main.shake(90, 0.006);
             this._pixelBurst(this.player.x, this.player.y, {
@@ -2126,15 +2479,43 @@ export default class MainScene extends Phaser.Scene {
     }
 
     // Shared zombie damage: flash, hurt-burst, kill when the HP runs out.
+    // Iron-helmet zombies take a detour first — every hit is absorbed by the
+    // armor pool (a metallic clang, no green splat) until it's empty, and
+    // only then does damage start coming off the zombie's own HP, same as a
+    // Plants vs. Zombies cone/bucket losing its headgear.
     _damageZombie(z, dmg) {
         if (!z.active) return;
+        if (z._helmet && z._armorHp > 0) {
+            z._armorHp -= dmg;
+            const helmetOff = z._armorHp <= 0;
+            z.setTintFill(0xffffff);
+            this.time.delayedCall(90, () => {
+                if (!z.active) return;
+                if (helmetOff) z.clearTint(); else z.setTint(0x9aa5ad);
+            });
+            z._stunUntil = Math.max(z._stunUntil || 0, this.time.now + 160);
+            this._pixelBurst(z.x, z.y, {
+                colors: [0xb0b8c0, 0xffffff, 0x707880],
+                count: 8, minSpeed: 80, maxSpeed: 220, gravity: 380
+            });
+            if (this.doomView && this.doomView.active) {
+                this.doomView.burstAtWorld(z.x, z.y, { colors: ['#b0b8c0', '#ffffff', '#707880'], count: 8 });
+            }
+            if (helmetOff) {
+                this.sounds.smash();
+                this.showCutText(z.x, z.y - 40, 'HELMET OFF!');
+            } else {
+                this.sounds.chop();
+            }
+            return;
+        }
         z._hp = (z._hp === undefined ? 2 : z._hp) - dmg;
         if (z._hp <= 0) {
             this._killZombie(z);
             return;
         }
         // Still standing: white flash + a small splat so the hit reads.
-        const baseTint = z._big ? 0x9adf6a : (z._fire ? 0xff6a3d : null);
+        const baseTint = z._big ? 0x9adf6a : (z._fire ? 0xff6a3d : (z._fast ? 0xfff200 : null));
         z.setTintFill(0xffffff);
         this.time.delayedCall(90, () => {
             if (!z.active) return;
@@ -2406,12 +2787,29 @@ export default class MainScene extends Phaser.Scene {
     setTool(tool) {
         if (this.tool === tool) return;
         this.tool = tool;
-        if (this._plankHud) this._plankHud.classList.toggle('selected', tool === 'plank');
+        this._updateToolHud();
+        const messages = {
+            axe: 'AXE selected (1)',
+            axegun: 'AXE GUN selected (2)\nHold F / FIRE to spray',
+            plank: 'PLANK selected (3)\nF / PLANK places a wall',
+        };
+        this.showToast(messages[tool] || '', 1600);
+    }
+
+    // Reflects the current tool on the 3-way tool row (which chip is lit up)
+    // and on the universal action button (its icon + label become FIRE for
+    // the axe gun, PLANK for planks, CHOP otherwise).
+    _updateToolHud() {
+        if (this._axeToolBtn) this._axeToolBtn.classList.toggle('selected', this.tool === 'axe');
+        if (this._axeGunToolBtn) this._axeGunToolBtn.classList.toggle('selected', this.tool === 'axegun');
+        if (this._plankHud) this._plankHud.classList.toggle('selected', this.tool === 'plank');
         if (this._actionBtn) {
             const label = this._actionBtn.querySelector('.action-label');
-            if (label) label.textContent = tool === 'plank' ? 'PLANK' : 'CHOP';
+            const icon = this._actionBtn.querySelector('.axe-icon, .axegun-icon');
+            if (label) label.textContent = this.tool === 'plank' ? 'PLANK' : (this.tool === 'axegun' ? 'FIRE' : 'CHOP');
+            if (icon) icon.className = this.tool === 'axegun' ? 'axegun-icon' : 'axe-icon';
+            this._actionBtn.setAttribute('aria-label', this.tool === 'axegun' ? 'Fire the axe gun' : 'Chop / interact');
         }
-        this.showToast(tool === 'plank' ? 'PLANK selected (2)\nF / CHOP places a wall' : 'AXE selected (1)', 1600);
     }
 
     // Drop a plank wall just ahead of the player (facing direction in 2D,
@@ -2477,6 +2875,18 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
+    // True if any active plank's rectangle sits on the segment between the
+    // two points — used to make enemy ranged attacks (bullets, fire breath)
+    // respect plank cover the same way physics collisions already do.
+    _lineBlockedByPlank(x1, y1, x2, y2) {
+        if (!this.plankGroup) return false;
+        const line = new Phaser.Geom.Line(x1, y1, x2, y2);
+        for (const p of this.plankGroup.getChildren()) {
+            if (p.active && Phaser.Geom.Intersects.LineToRectangle(line, p.getBounds())) return true;
+        }
+        return false;
+    }
+
     // ===== Ranged slash (Hollow-Knight style) =====
 
     // Ranged is a FULL-HEALTH-only privilege: fire the slash if the player has
@@ -2524,6 +2934,64 @@ export default class MainScene extends Phaser.Scene {
         });
         if (this.doomView && this.doomView.active) {
             this.doomView.burstAtWorld(sx, sy, { colors: ['#8ff0ff', '#ffffff', '#00c7ff'], count: 8 });
+        }
+    }
+
+    // ===== Axe gun (rapid-fire tool) =====
+
+    // Twin-stick aim: 2D mouse/mouse-look angle from the player to the
+    // cursor's world position. Touch has no cursor, so it falls back to the
+    // player's last walking direction (matches the mobile FIRE button's
+    // original "shoot the way you're facing" behavior).
+    _axeGunAimAngle() {
+        if (!this.isTouch()) {
+            const p = this.input.activePointer;
+            return Math.atan2(p.worldY - this.player.y, p.worldX - this.player.x);
+        }
+        const dirs = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2, none: 0 };
+        return dirs[this.lastDirection] || 0;
+    }
+
+    // Throws a small tumbling hatchet in the given (unit) direction. No
+    // full-health gate like the slash — this is a distinct ranged tool, kept
+    // in check purely by its low per-hit damage + fire-rate cap.
+    _fireAxeGun(dx, dy) {
+        const a = this.axeGunGroup.create(this.player.x + dx * 30, this.player.y + dy * 30, 'axe', 0);
+        a.setScale(1.6).setDepth(15997);
+        a.body.setSize(24, 24, true);
+        a.setVelocity(dx * 780, dy * 780);
+        if (this.miniMap) this.miniMap.ignore(a);
+        // Tumbles end-over-end like a thrown hatchet instead of staying aimed.
+        this.tweens.add({ targets: a, angle: '+=900', duration: 500, repeat: -1 });
+        // Ranged, not infinite: fizzles out after ~390px of flight.
+        this.time.delayedCall(500, () => { if (a.active) this._popAxeGun(a, true); });
+    }
+
+    _axeGunHitsZombie(a, z) {
+        if (!a.active || !z.active) return;
+        this._popAxeGun(a);
+        this._damageZombie(z, 0.5);
+    }
+
+    _axeGunHitsCowboy(a, c) {
+        if (!a.active || !c.active) return;
+        this._popAxeGun(a);
+        this._damageCowboy(0.5);
+    }
+
+    // The little axe splinters — quietly when it just runs out of range, with
+    // a small wood-and-glow sparkle when it actually hit something.
+    _popAxeGun(a, quiet = false) {
+        if (!a.active) return;
+        const ax = a.x, ay = a.y;
+        a.destroy();
+        if (quiet) return;
+        this._pixelBurst(ax, ay, {
+            colors: [0xc6ff33, 0xffffff, 0x8b5a2b],
+            count: 6, minSpeed: 50, maxSpeed: 160, gravity: 260
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(ax, ay, { colors: ['#c6ff33', '#ffffff', '#8b5a2b'], count: 6 });
         }
     }
 
@@ -2740,6 +3208,7 @@ export default class MainScene extends Phaser.Scene {
             this.physics.add.collider(c, this.brownSchool),
             this.physics.add.overlap(this.axe, c, this._axeHitsCowboy, null, this),
             this.physics.add.overlap(this.slashGroup, c, this._slashHitsCowboy, null, this),
+            this.physics.add.overlap(this.axeGunGroup, c, this._axeGunHitsCowboy, null, this),
             this.physics.add.overlap(c, this.bombs, this._cowboyTripsBomb, null, this),
         ];
         this._pixelBurst(x, y, {
@@ -2774,6 +3243,13 @@ export default class MainScene extends Phaser.Scene {
 
         const c = this.cowboy;
         if (!c || !c.active) return;
+
+        // A dash-shield knockback (or anything else that sets _stunUntil)
+        // owns his velocity while it bleeds off — same pattern as zombies.
+        if (now < (c._stunUntil || 0)) {
+            c.setVelocity(c.body.velocity.x * 0.9, c.body.velocity.y * 0.9);
+            return;
+        }
 
         const dxp = this.player.x - c.x, dyp = this.player.y - c.y;
         const distToPlayer = Math.hypot(dxp, dyp);

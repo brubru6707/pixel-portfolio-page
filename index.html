@@ -629,31 +629,55 @@
             #cscore-hud { right: 186px; top: 150px; }
         }
 
-        /* Plank tool chip: shows the plank count, doubles as the tool switch
-           (keyboard 1/2 does the same). Sits above the CHOP button. */
-        #plank-hud {
+        /* Tool row: axe / axe gun / plank chips, one tap each to switch tools
+           directly (keyboard 1/2/3 do the same). Sits above the action button. */
+        #tool-hud {
             position: fixed;
             bottom: max(184px, calc(env(safe-area-inset-bottom) + 184px));
             right: 20px;
+            display: flex;
+            flex-direction: row;
+            gap: 8px;
+            z-index: 1500;
+        }
+        #axe-tool-btn, #axegun-tool-btn {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+        }
+        #axe-tool-btn .axe-icon { height: 22px; }
+        /* Axe-gun icon, cropped from the whole (non-spritesheet) weapon image. */
+        .axegun-icon {
+            display: inline-block;
+            height: 1.2em;
+            aspect-ratio: 30 / 20;
+            vertical-align: middle;
+            background: center / contain no-repeat url('assets/axe-gun.png');
+            image-rendering: pixelated;
+        }
+        #action-btn .axegun-icon { height: 30px; }
+        #axegun-tool-btn .axegun-icon { height: 20px; }
+        #plank-tool-btn {
             height: 44px;
             padding: 0 12px 0 8px;
             gap: 8px;
-            z-index: 1500;
             font-size: 12px;
         }
-        #plank-hud .plank-icon {
+        #plank-tool-btn .plank-icon {
             width: 22px;
             height: 24px;
             image-rendering: pixelated;
             background: center / contain no-repeat url("assets/plank.png");
         }
-        #plank-hud.selected {
+        #axe-tool-btn.selected, #axegun-tool-btn.selected, #plank-tool-btn.selected {
             border-color: #ffb340;
             color: #ffb340;
             box-shadow: 4px 4px 0 #000, 0 0 12px rgba(255, 179, 64, 0.6);
         }
         @media (max-width: 600px) {
-            #plank-hud { bottom: max(172px, calc(env(safe-area-inset-bottom) + 172px)); }
+            #tool-hud { bottom: max(172px, calc(env(safe-area-inset-bottom) + 172px)); }
+            #axe-tool-btn, #axegun-tool-btn { width: 40px; height: 40px; }
+            #plank-tool-btn { height: 40px; }
         }
 
         /* Hide all HUD controls behind an open sub-page or modal */
@@ -664,7 +688,7 @@
         body.subpage-open #score-hud,     body.modal-open #score-hud,
         body.subpage-open #zscore-hud,    body.modal-open #zscore-hud,
         body.subpage-open #cscore-hud,    body.modal-open #cscore-hud,
-        body.subpage-open #plank-hud,     body.modal-open #plank-hud,
+        body.subpage-open #tool-hud,      body.modal-open #tool-hud,
         body.subpage-open #extra-btns,    body.modal-open #extra-btns,
         body.subpage-open #exit-btn,      body.modal-open #exit-btn,
         body.subpage-open #topleft-hud,   body.modal-open #topleft-hud,
@@ -683,7 +707,7 @@
         body:not(.hud-ready) #score-hud,
         body:not(.hud-ready) #zscore-hud,
         body:not(.hud-ready) #cscore-hud,
-        body:not(.hud-ready) #plank-hud,
+        body:not(.hud-ready) #tool-hud,
         body:not(.hud-ready) #topleft-hud,
         body:not(.hud-ready) #stats-hud,
         body:not(.hud-ready) #help-btn { display: none; }

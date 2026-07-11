@@ -127,6 +127,15 @@ export default class SoundManager {
         this.noise(0.13, { type: 'highpass', from: 900, to: 1600, gain: 0.08 });
     }
 
+    // Big "WOOOSH" for the dash burst — a fast high-to-low sweep (like
+    // swing() but bigger/longer) layered with a short low thump so it reads
+    // as a burst of speed, distinct from the little direction-change whoosh.
+    dash() {
+        this.noise(0.26, { type: 'bandpass', from: 4200, to: 150, gain: 0.5 });
+        this.noise(0.12, { type: 'highpass', from: 2500, to: 5000, gain: 0.2 });
+        this.tone(90, 40, 0.12, { type: 'sine', gain: 0.25 });
+    }
+
     // Thunk for a successful axe hit
     chop() {
         this.tone(180, 70, 0.09, { type: 'square', gain: 0.3 });
