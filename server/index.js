@@ -114,9 +114,13 @@ const server = https.createServer({
 });
 const wss = new WebSocketServer({ server, maxPayload: MAX_MESSAGE_BYTES });
 
-const players = new Map(); // id -> { ws, num, x, y, dir }
+const players = new Map(); // id -> { ws, num, x, y, dir, pvp, spectator, votes }
 const usedNumbers = new Set();
 let nextId = 1;
+
+// The opt-in game modes players can vote on. Majority of active ✓ over ✗
+// turns a mode on for everyone (shared world state).
+const MODES = ['zombies', 'cowboy', 'cowgirl'];
 
 function nextPlayerNumber() {
     let n = 1;
@@ -125,10 +129,30 @@ function nextPlayerNumber() {
     return n;
 }
 
+// Tally every active player's vote per mode. A mode is "on" when strictly more
+// players voted ✓ (1) than ✗ (-1); abstentions (0) don't count either way.
+function tallyModes() {
+    const out = {};
+    for (const mode of MODES) {
+        let yes = 0, no = 0;
+        for (const p of players.values()) {
+            const v = p.votes[mode];
+            if (v === 1) yes++;
+            else if (v === -1) no++;
+        }
+        out[mode] = { yes, no, on: yes > no };
+    }
+    return out;
+}
+
 function broadcastState() {
     if (players.size === 0) return;
-    const list = [...players.values()].map(p => ({ id: p.id, num: p.num, x: p.x, y: p.y, dir: p.dir }));
-    const payload = JSON.stringify({ type: 'state', players: list });
+    const list = [...players.values()].map(p => ({
+        id: p.id, num: p.num, x: p.x, y: p.y, dir: p.dir,
+        pvp: !!p.pvp, spectator: !!p.spectator
+    }));
+    const modes = tallyModes();
+    const payload = JSON.stringify({ type: 'state', players: list, modes });
     for (const p of players.values()) {
         if (p.ws.readyState === p.ws.OPEN) p.ws.send(payload);
     }
@@ -146,7 +170,12 @@ wss.on('connection', (ws, req) => {
 
     const id = nextId++;
     const num = nextPlayerNumber();
-    const player = { id, ws, num, x: 0, y: 0, dir: 'idle', _msgWindowStart: Date.now(), _msgCount: 0 };
+    const player = {
+        id, ws, num, x: 0, y: 0, dir: 'idle',
+        pvp: false, spectator: false,
+        votes: { zombies: 0, cowboy: 0, cowgirl: 0 },
+        _msgWindowStart: Date.now(), _msgCount: 0
+    };
     players.set(id, player);
 
     ws.isAlive = true;
@@ -165,11 +194,47 @@ wss.on('connection', (ws, req) => {
 
         let msg;
         try { msg = JSON.parse(raw); } catch (e) { return; }
-        if (msg.type !== 'pos') return;
-        if (typeof msg.x !== 'number' || typeof msg.y !== 'number' || !Number.isFinite(msg.x) || !Number.isFinite(msg.y)) return;
-        player.x = Math.max(0, Math.min(WORLD_SIZE, msg.x));
-        player.y = Math.max(0, Math.min(WORLD_SIZE, msg.y));
-        player.dir = typeof msg.dir === 'string' ? msg.dir.slice(0, 16) : 'idle';
+
+        if (msg.type === 'pos') {
+            if (typeof msg.x !== 'number' || typeof msg.y !== 'number' || !Number.isFinite(msg.x) || !Number.isFinite(msg.y)) return;
+            player.x = Math.max(0, Math.min(WORLD_SIZE, msg.x));
+            player.y = Math.max(0, Math.min(WORLD_SIZE, msg.y));
+            player.dir = typeof msg.dir === 'string' ? msg.dir.slice(0, 16) : 'idle';
+            return;
+        }
+
+        // A player's ✓/✗ vote on one game mode (1 = yes, -1 = no, 0 = abstain).
+        // The next broadcastState re-tallies and ships the new on/off state.
+        if (msg.type === 'vote') {
+            if (!MODES.includes(msg.mode)) return;
+            const v = msg.val === 1 ? 1 : msg.val === -1 ? -1 : 0;
+            player.votes[msg.mode] = v;
+            broadcastState(); // reflect the new tally immediately, don't wait for the tick
+            return;
+        }
+
+        // Player's PvP / spectator state. Broadcast so peers know who's fightable.
+        if (msg.type === 'pvp') {
+            player.pvp = !!msg.on;
+            player.spectator = !!msg.spectator;
+            broadcastState();
+            return;
+        }
+
+        // Player claims to have struck another player. Only forwarded (never
+        // trusted for authoritative HP) — and only when BOTH sides opted into
+        // PvP and neither is spectating. The target applies the damage locally.
+        if (msg.type === 'hit') {
+            const target = players.get(msg.target);
+            if (!target || target.id === player.id) return;
+            if (!player.pvp || player.spectator || !target.pvp || target.spectator) return;
+            const dmg = Math.max(0, Math.min(3, Number(msg.dmg) || 0));
+            if (dmg <= 0) return;
+            if (target.ws.readyState === target.ws.OPEN) {
+                target.ws.send(JSON.stringify({ type: 'hit', from: player.num, dmg }));
+            }
+            return;
+        }
     });
 
     ws.on('close', () => {

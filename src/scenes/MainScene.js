@@ -13,9 +13,206 @@ const REMOTE_PLAYER_TINTS = [0x66d9ff, 0xffb86c, 0xff79c6, 0x50fa7b, 0xbd93f9, 0
 let downF;
 let playerNearTree = false;
 
+// ---- i18n: gear-icon settings panel drives this. Scope is the UI chrome —
+// HUD button labels/aria-labels, the tutorial card, the settings panel
+// itself, and the key mode-toggle/status toasts. Short flavor/hype text
+// (Z E N I T H!!, GOT 'EM!, RADICAL) stays in English on purpose, same as
+// many localized games keep stylized exclamations untranslated. `{axe}`
+// is a placeholder swapped for the axe-icon <span> at render time.
+const I18N = {
+    en: {
+        gearAria: 'Open settings', settingsTitle: 'SETTINGS',
+        themeLabel: 'THEME', themeLight: 'LIGHT', themeDark: 'DARK',
+        languageLabel: 'LANGUAGE', settingsClose: 'CLOSE',
+        helpAria: 'How to play', musicAria: 'Toggle music', sfxAria: 'Mute sound effects',
+        exitLabel: 'exit', exitAria: 'Exit and reset visitor choice',
+        zombiesLabel: 'zombies', zombiesAria: 'Toggle zombies',
+        cowboyLabel: 'cowboy', cowboyAria: 'Toggle the cowboy duel',
+        cowgirlLabel: 'cowgirl', cowgirlAria: 'Toggle the cowgirl on her pig',
+        gameModesLabel: 'game modes', gameModesAria: 'Open the game modes menu',
+        modesTitle: 'GAME MODES', modesNote: 'Active players vote — majority ✓ turns a mode on for everyone',
+        voteYesAria: 'Vote to enable', voteNoAria: 'Vote to disable', modeOn: 'ON',
+        pvpAria: 'Toggle PvP / spectator', pvpSpectate: 'spectate', pvpFight: '⚔ PvP',
+        toastPvpOn: 'PvP ON\nYou can hit — and be hit by — other fighters',
+        toastPvpOff: 'SPECTATING\nYou\'re a harmless ghost again',
+        soundLabel: 'SOUND', sfxOn: 'SFX ON', sfxOff: 'SFX OFF', helpLabel: 'HOW TO PLAY',
+        doomPanelLabel: '3D SETTINGS',
+        gameOverLabel: 'GAME OVER', restartLabel: 'RESTART?', restartAria: 'Restart in the 2D world', exitGameAria: 'Exit to the visitor screen',
+        axeToolAria: 'Switch to the axe (1)', axeGunToolAria: 'Switch to the axe gun (2)', plankToolAria: 'Switch to planks (3)',
+        actionChop: 'CHOP', actionFire: 'FIRE', actionPlank: 'PLANK',
+        actionAriaChop: 'Chop / interact', actionAriaFire: 'Fire the axe gun',
+        toastAxeSelected: 'AXE selected (1)',
+        toastGunSelected: 'AXE GUN selected (2)\nHold F / FIRE to spray',
+        toastPlankSelected: 'PLANK selected (3)\nF / PLANK places a wall',
+        tutTitle: '{axe} HOW TO PLAY',
+        tutMoveTouch: 'Tap anywhere on the ground to walk there',
+        tutMoveDesktop: 'Move with WASD or the arrow keys',
+        tutChopTouch: 'Stand next to a tree, ghost, computer or orb and hold the {axe} <b>CHOP</b> button. It glows when you’re close enough.',
+        tutChopDesktop: 'Stand next to something and hold <b>F</b> (or the {axe} button) to chop. It glows when you’re in range.',
+        tutDoomTouch: 'Tap <b>3D</b> for the 3D view. Use the <b>&#9650;&#9660;&#9668;&#9658;</b> pad to turn &amp; walk, then hold CHOP.',
+        tutDoomDesktop: 'Tap <b>3D</b> for the 3D DOOM view. Turn/walk with the arrow keys, chop with <b>F</b>.',
+        tutEscTouch: 'Chopping a target opens its page. Tap the <b>ESC</b> button (bottom-right) to come back.',
+        tutEscDesktop: 'Chopping a target opens its page. Press <b>ESC</b> (or the bottom-right button) to come back.',
+        tutStart: "LET'S GO",
+        tutNote: 'Chop the trees, ghosts, computer &amp; orb to explore my projects. Reopen this anytime from the <b>⚙</b> settings.',
+        toastCowboyRideIn: 'A COWBOY RIDES IN\nFROM THE EAST...',
+        toastCowboyDown: "The cowboy is down...\nhe'll ride back in 30s",
+        toastCowgirlRideIn: "SHE'S RIDING IN ON HER PIG...\nWATCH FOR THE LASSO",
+        toastCowgirlDown: "She rode off...\nshe'll swoop back in 30s",
+        toastLassoed: 'LASSOED!\nSlowed down and no dashing...',
+        toastRangedLocked: 'RANGED LOCKED\nFULL HEALTH ONLY',
+        toastNoPlanks: 'NO PLANKS!\nChop 3 trees to earn one',
+        toastPlankEarned: '+1 PLANK!\nPress 3 (or tap the plank chip) to place it',
+    },
+    es: {
+        gearAria: 'Abrir ajustes', settingsTitle: 'AJUSTES',
+        themeLabel: 'TEMA', themeLight: 'CLARO', themeDark: 'OSCURO',
+        languageLabel: 'IDIOMA', settingsClose: 'CERRAR',
+        helpAria: 'Cómo jugar', musicAria: 'Activar/desactivar música', sfxAria: 'Silenciar efectos de sonido',
+        exitLabel: 'salir', exitAria: 'Salir y reiniciar la elección de visitante',
+        zombiesLabel: 'zombis', zombiesAria: 'Activar zombis',
+        cowboyLabel: 'vaquero', cowboyAria: 'Activar el duelo con el vaquero',
+        cowgirlLabel: 'vaquera', cowgirlAria: 'Activar a la vaquera en su cerdo',
+        gameModesLabel: 'modos', gameModesAria: 'Abrir el menú de modos de juego',
+        modesTitle: 'MODOS DE JUEGO', modesNote: 'Los jugadores activos votan — la mayoría ✓ activa un modo para todos',
+        voteYesAria: 'Votar para activar', voteNoAria: 'Votar para desactivar', modeOn: 'ON',
+        pvpAria: 'Alternar JcJ / espectador', pvpSpectate: 'mirar', pvpFight: '⚔ JcJ',
+        toastPvpOn: '¡JcJ ACTIVADO!\nPuedes golpear — y ser golpeado por — otros luchadores',
+        toastPvpOff: 'MODO ESPECTADOR\nVuelves a ser un fantasma inofensivo',
+        soundLabel: 'SONIDO', sfxOn: 'EFECTOS ON', sfxOff: 'EFECTOS OFF', helpLabel: 'CÓMO JUGAR',
+        doomPanelLabel: 'AJUSTES 3D',
+        gameOverLabel: 'FIN DEL JUEGO', restartLabel: '¿REINICIAR?', restartAria: 'Reiniciar en el mundo 2D', exitGameAria: 'Salir a la pantalla de visitante',
+        axeToolAria: 'Cambiar al hacha (1)', axeGunToolAria: 'Cambiar al hacha lanzadora (2)', plankToolAria: 'Cambiar a tablones (3)',
+        actionChop: 'CORTAR', actionFire: 'DISPARAR', actionPlank: 'TABLÓN',
+        actionAriaChop: 'Cortar / interactuar', actionAriaFire: 'Disparar el hacha lanzadora',
+        toastAxeSelected: 'HACHA seleccionada (1)',
+        toastGunSelected: 'HACHA LANZADORA seleccionada (2)\nMantén F / DISPARAR para rociar',
+        toastPlankSelected: 'TABLÓN seleccionado (3)\nF / TABLÓN coloca un muro',
+        tutTitle: '{axe} CÓMO JUGAR',
+        tutMoveTouch: 'Toca cualquier punto del suelo para caminar hasta allí',
+        tutMoveDesktop: 'Muévete con WASD o las flechas del teclado',
+        tutChopTouch: 'Colócate junto a un árbol, fantasma, computadora u orbe y mantén pulsado el botón {axe} <b>CORTAR</b>. Brilla cuando estás lo bastante cerca.',
+        tutChopDesktop: 'Colócate junto a algo y mantén pulsada <b>F</b> (o el botón {axe}) para cortar. Brilla cuando estás en rango.',
+        tutDoomTouch: 'Toca <b>3D</b> para la vista en 3D. Usa el panel <b>&#9650;&#9660;&#9668;&#9658;</b> para girar y caminar, luego mantén CORTAR.',
+        tutDoomDesktop: 'Pulsa <b>3D</b> para la vista DOOM en 3D. Gira/camina con las flechas, corta con <b>F</b>.',
+        tutEscTouch: 'Cortar un objetivo abre su página. Toca el botón <b>ESC</b> (abajo a la derecha) para volver.',
+        tutEscDesktop: 'Cortar un objetivo abre su página. Pulsa <b>ESC</b> (o el botón de abajo a la derecha) para volver.',
+        tutStart: '¡VAMOS!',
+        tutNote: 'Corta los árboles, fantasmas, la computadora y el orbe para explorar mis proyectos. Reabre esto cuando quieras desde <b>⚙</b> ajustes.',
+        toastCowboyRideIn: 'UN VAQUERO LLEGA\nDESDE EL ESTE...',
+        toastCowboyDown: 'El vaquero ha caído...\nvolverá en 30s',
+        toastCowgirlRideIn: '¡ELLA LLEGA EN SU CERDO...!\nCUIDADO CON EL LAZO',
+        toastCowgirlDown: 'Ella se fue...\nvolverá en 30s',
+        toastLassoed: '¡ATRAPADO CON EL LAZO!\nMás lento y sin dash...',
+        toastRangedLocked: 'ATAQUE A DISTANCIA BLOQUEADO\nSOLO CON VIDA COMPLETA',
+        toastNoPlanks: '¡SIN TABLONES!\nCorta 3 árboles para conseguir uno',
+        toastPlankEarned: '¡+1 TABLÓN!\nPulsa 3 (o toca la ficha) para colocarlo',
+    },
+    zh: {
+        gearAria: '打开设置', settingsTitle: '设置',
+        themeLabel: '主题', themeLight: '浅色', themeDark: '深色',
+        languageLabel: '语言', settingsClose: '关闭',
+        helpAria: '游戏玩法', musicAria: '切换音乐', sfxAria: '静音音效',
+        exitLabel: '退出', exitAria: '退出并重置访客选择',
+        zombiesLabel: '僵尸', zombiesAria: '切换僵尸',
+        cowboyLabel: '牛仔', cowboyAria: '切换牛仔对决',
+        cowgirlLabel: '女牛仔', cowgirlAria: '切换骑猪女牛仔',
+        gameModesLabel: '游戏模式', gameModesAria: '打开游戏模式菜单',
+        modesTitle: '游戏模式', modesNote: '在线玩家投票——多数 ✓ 会为所有人开启该模式',
+        voteYesAria: '投票开启', voteNoAria: '投票关闭', modeOn: '开',
+        pvpAria: '切换 PvP / 观战', pvpSpectate: '观战', pvpFight: '⚔ PvP',
+        toastPvpOn: 'PvP 已开启\n你可以攻击其他战斗玩家，也会被攻击',
+        toastPvpOff: '观战模式\n你又变回无害的幽灵',
+        soundLabel: '声音', sfxOn: '音效开', sfxOff: '音效关', helpLabel: '玩法说明',
+        doomPanelLabel: '3D 设置',
+        gameOverLabel: '游戏结束', restartLabel: '重新开始？', restartAria: '在2D世界重新开始', exitGameAria: '退出到访客界面',
+        axeToolAria: '切换到斧头 (1)', axeGunToolAria: '切换到斧头枪 (2)', plankToolAria: '切换到木板 (3)',
+        actionChop: '砍伐', actionFire: '开火', actionPlank: '木板',
+        actionAriaChop: '砍伐/互动', actionAriaFire: '发射斧头枪',
+        toastAxeSelected: '已选择斧头 (1)',
+        toastGunSelected: '已选择斧头枪 (2)\n按住 F / 开火 进行扫射',
+        toastPlankSelected: '已选择木板 (3)\nF / 木板 放置一面墙',
+        tutTitle: '{axe} 玩法说明',
+        tutMoveTouch: '点击地面任意位置即可走过去',
+        tutMoveDesktop: '使用 WASD 或方向键移动',
+        tutChopTouch: '站在树木、幽灵、电脑或宝珠旁，按住 {axe} <b>砍</b> 按钮。靠近时按钮会发光。',
+        tutChopDesktop: '站在物体旁，按住 <b>F</b>（或 {axe} 按钮）进行砍伐。在范围内时按钮会发光。',
+        tutDoomTouch: '点击 <b>3D</b> 进入3D视角。使用 <b>&#9650;&#9660;&#9668;&#9658;</b> 方向键转向和行走，然后按住砍伐键。',
+        tutDoomDesktop: '点击 <b>3D</b> 进入3D DOOM视角。用方向键转向/行走，按 <b>F</b> 砍伐。',
+        tutEscTouch: '砍伐目标会打开它的页面。点击右下角的 <b>ESC</b> 按钮返回。',
+        tutEscDesktop: '砍伐目标会打开它的页面。按 <b>ESC</b>（或右下角按钮）返回。',
+        tutStart: '开始！',
+        tutNote: '砍伐树木、幽灵、电脑和宝珠来探索我的项目。随时可通过 <b>⚙</b> 设置重新打开本说明。',
+        toastCowboyRideIn: '一个牛仔从东边\n骑马而来...',
+        toastCowboyDown: '牛仔倒下了……\n30秒后会回来',
+        toastCowgirlRideIn: '她骑着猪冲过来了……\n小心她的套索',
+        toastCowgirlDown: '她骑走了……\n30秒后会回来',
+        toastLassoed: '被套索缠住了！\n速度变慢，无法冲刺……',
+        toastRangedLocked: '远程攻击已锁定\n仅生命值满时可用',
+        toastNoPlanks: '没有木板了！\n砍3棵树可获得一块',
+        toastPlankEarned: '+1 木板！\n按 3（或点击木板图标）放置',
+    },
+    fr: {
+        gearAria: 'Ouvrir les paramètres', settingsTitle: 'PARAMÈTRES',
+        themeLabel: 'THÈME', themeLight: 'CLAIR', themeDark: 'SOMBRE',
+        languageLabel: 'LANGUE', settingsClose: 'FERMER',
+        helpAria: 'Comment jouer', musicAria: 'Activer/désactiver la musique', sfxAria: 'Couper les effets sonores',
+        exitLabel: 'quitter', exitAria: 'Quitter et réinitialiser le choix du visiteur',
+        zombiesLabel: 'zombies', zombiesAria: 'Activer les zombies',
+        cowboyLabel: 'cowboy', cowboyAria: 'Activer le duel avec le cowboy',
+        cowgirlLabel: 'cowgirl', cowgirlAria: 'Activer la cowgirl sur son cochon',
+        gameModesLabel: 'modes', gameModesAria: 'Ouvrir le menu des modes de jeu',
+        modesTitle: 'MODES DE JEU', modesNote: 'Les joueurs actifs votent — la majorité ✓ active un mode pour tous',
+        voteYesAria: 'Voter pour activer', voteNoAria: 'Voter pour désactiver', modeOn: 'ON',
+        pvpAria: 'Basculer JcJ / spectateur', pvpSpectate: 'observer', pvpFight: '⚔ JcJ',
+        toastPvpOn: 'JcJ ACTIVÉ\nVous pouvez frapper — et être frappé par — d\'autres combattants',
+        toastPvpOff: 'MODE SPECTATEUR\nVous redevenez un fantôme inoffensif',
+        soundLabel: 'SON', sfxOn: 'EFFETS ON', sfxOff: 'EFFETS OFF', helpLabel: 'COMMENT JOUER',
+        doomPanelLabel: 'RÉGLAGES 3D',
+        gameOverLabel: 'PARTIE TERMINÉE', restartLabel: 'RECOMMENCER ?', restartAria: 'Recommencer dans le monde 2D', exitGameAria: 'Quitter vers l\'écran visiteur',
+        axeToolAria: 'Passer à la hache (1)', axeGunToolAria: 'Passer au lance-hache (2)', plankToolAria: 'Passer aux planches (3)',
+        actionChop: 'COUPER', actionFire: 'TIRER', actionPlank: 'PLANCHE',
+        actionAriaChop: 'Couper / interagir', actionAriaFire: 'Tirer avec le lance-hache',
+        toastAxeSelected: 'HACHE sélectionnée (1)',
+        toastGunSelected: 'LANCE-HACHE sélectionné (2)\nMaintenez F / TIRER pour arroser',
+        toastPlankSelected: 'PLANCHE sélectionnée (3)\nF / PLANCHE pose un mur',
+        tutTitle: '{axe} COMMENT JOUER',
+        tutMoveTouch: "Touchez n'importe où au sol pour vous y déplacer",
+        tutMoveDesktop: 'Déplacez-vous avec WASD ou les flèches',
+        tutChopTouch: "Placez-vous près d'un arbre, fantôme, ordinateur ou orbe et maintenez le bouton {axe} <b>COUPER</b>. Il s'illumine quand vous êtes assez proche.",
+        tutChopDesktop: "Placez-vous près d'un objet et maintenez <b>F</b> (ou le bouton {axe}) pour couper. Il s'illumine quand vous êtes à portée.",
+        tutDoomTouch: 'Touchez <b>3D</b> pour la vue 3D. Utilisez le pavé <b>&#9650;&#9660;&#9668;&#9658;</b> pour tourner et marcher, puis maintenez COUPER.',
+        tutDoomDesktop: 'Appuyez sur <b>3D</b> pour la vue DOOM en 3D. Tournez/marchez avec les flèches, coupez avec <b>F</b>.',
+        tutEscTouch: 'Couper une cible ouvre sa page. Touchez le bouton <b>ESC</b> (en bas à droite) pour revenir.',
+        tutEscDesktop: 'Couper une cible ouvre sa page. Appuyez sur <b>ESC</b> (ou le bouton en bas à droite) pour revenir.',
+        tutStart: "C'EST PARTI",
+        tutNote: "Coupez les arbres, fantômes, l'ordinateur et l'orbe pour explorer mes projets. Rouvrez ceci à tout moment depuis les réglages <b>⚙</b>.",
+        toastCowboyRideIn: "UN COWBOY ARRIVE\nDE L'EST...",
+        toastCowboyDown: 'Le cowboy est à terre...\nil reviendra dans 30s',
+        toastCowgirlRideIn: 'ELLE ARRIVE SUR SON COCHON...\nATTENTION AU LASSO',
+        toastCowgirlDown: 'Elle est repartie...\nelle reviendra dans 30s',
+        toastLassoed: 'ATTRAPÉ AU LASSO !\nPlus lent et impossible de foncer...',
+        toastRangedLocked: 'ATTAQUE À DISTANCE BLOQUÉE\nSANTÉ COMPLÈTE REQUISE',
+        toastNoPlanks: 'PLUS DE PLANCHES !\nCoupez 3 arbres pour en gagner une',
+        toastPlankEarned: '+1 PLANCHE !\nAppuyez sur 3 (ou touchez la puce planche) pour la poser',
+    },
+};
+
 export default class MainScene extends Phaser.Scene {
     constructor() {
         super('MainScene');
+        // Settings (gear icon): theme + language, applied immediately (before
+        // the HUD DOM exists) so there's no flash of the wrong theme.
+        this.lang = 'en';
+        this.theme = 'dark';
+        try {
+            const savedLang = localStorage.getItem('lang');
+            if (savedLang && I18N[savedLang]) this.lang = savedLang;
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light' || savedTheme === 'dark') this.theme = savedTheme;
+        } catch (e) {}
+        document.body.classList.toggle('theme-light', this.theme === 'light');
+
         this.axeRotations = 0;
         // Total trees ever chopped — persisted across visits (see cutTree).
         this.logs = 0;
@@ -25,6 +222,14 @@ export default class MainScene extends Phaser.Scene {
         } catch (e) {}
         this.canChop = true; // Cooldown flag for axe
         this.lastDirection = 'none'; // Track player's last direction
+        // Which way the player is actually facing for aim purposes. Unlike
+        // lastDirection (which resets to 'none' on arrival/idle so animation
+        // logic knows to go idle), this only ever updates on a real direction
+        // — so touch-aim (no cursor to point with) still points the axe the
+        // way the player was last walking instead of falling back to a
+        // hardcoded default.
+        this.facingDirection = 'down';
+        this._isGameOver = false;
         this.miniMap = null;
         this.acceleration = 15;
         this.maxSpeed = 200;
@@ -42,14 +247,15 @@ export default class MainScene extends Phaser.Scene {
         this.DASH_SPEED = 900;        // px/s during the burst
         this.DASH_COOLDOWN = 1000;    // ms before another dash can trigger
         // Dash shield: a barrier that rides in front of the player for the
-        // dash's duration, knocking back (once each) any zombie/cowboy caught
-        // in the cone ahead.
+        // dash's duration, damaging + knocking back (once each) any
+        // zombie/cowboy/cowgirl caught in the cone ahead.
         this._dashShield = null;
         this._dashHitSet = new Set();
         this.DASH_SHIELD_RANGE = 100;      // px — how far ahead the cone reaches
         this.DASH_SHIELD_HALF_ANGLE = 1.0; // radians (~57°) half-angle of the cone
         this.DASH_KNOCKBACK_SPEED = 1700;  // px/s applied to whatever gets hit
         this.DASH_KNOCKBACK_STUN = 700;    // ms the launch + stun lasts
+        this.DASH_DAMAGE = 2;              // matches the axe's melee chop
         this.orbActivated = false;
         this.touchTarget = { x: 0, y: 0 };
         this.movementTimer = null;
@@ -117,10 +323,10 @@ export default class MainScene extends Phaser.Scene {
         this._treesTowardPlank = 0;
         this._actionWasDown = false;   // edge detector for one-per-press placement
 
-        // Axe gun — rapid-fire ranged tool, 1/4 the axe's melee damage per
-        // hit but fires continuously while held (roughly matches the axe's
-        // sustained DPS as a spray instead of a swing).
+        // Axe gun — rapid-fire ranged tool, weak per hit but fires
+        // continuously while held (a spray, not a swing).
         this.AXEGUN_FIRE_RATE = 110;   // ms between shots while held
+        this.AXEGUN_DAMAGE = 0.3;      // per-pellet damage (was 0.5 — toned down)
         this._lastAxeGunShot = 0;
 
         // Zenith frenzy — every 5 zombie kills: 3s of Terraria-Zenith flying
@@ -141,6 +347,23 @@ export default class MainScene extends Phaser.Scene {
         try {
             const ck = parseInt(localStorage.getItem('cowboyKills'), 10);
             if (!isNaN(ck)) this.cowboyKills = ck;
+        } catch (e) {}
+
+        // Cowgirl-on-a-pig — opt-in via the "cowgirl?" HUD button, right next
+        // to the cowboy toggle. She's an airborne contact attacker: constant
+        // pursuit with a slow turn rate (wide swooping arcs instead of
+        // snapping onto the player) and isn't bound by the world edges.
+        this.cowgirlEnabled = false;
+        this.cowgirl = null;
+        this.COWGIRL_HP = 18;
+        this.COWGIRL_SPEED = 240;
+        this.COWGIRL_TURN_RATE = 0.9; // radians/sec — low, so she takes a while to come back around
+        this.cowgirlKills = 0;
+        this._cowgirlDmgUntil = 0;
+        this._lassoedUntil = 0;       // player status: slowed, no dash, roped up
+        try {
+            const gk = parseInt(localStorage.getItem('cowgirlKills'), 10);
+            if (!isNaN(gk)) this.cowgirlKills = gk;
         } catch (e) {}
 
         // Zombie horde — opt-in via the "zombies?" HUD button. Zombies chase
@@ -191,6 +414,7 @@ export default class MainScene extends Phaser.Scene {
         this.load.image('instructions', 'assets/instructions.png');
         // 5 frames: 0-3 walk, 4 = drawing the gun (he only shoots to his right).
         this.load.spritesheet('cowboy', 'assets/cowboy.png', { frameWidth: 20, frameHeight: 30 });
+        this.load.spritesheet('cowgirl', 'assets/cow-girl-on-pig.png', { frameWidth: 100, frameHeight: 100 });
 
         // Brown-world project previews.
         this.load.image('shape-up', 'assets/subdomains/shape-up.png');
@@ -226,8 +450,20 @@ export default class MainScene extends Phaser.Scene {
         // non-interactive "Player N" ghosts (see _syncRemotePlayers below).
         this._network = new NetworkManager(WS_URL, {
             onState: (players) => this._syncRemotePlayers(players),
-            onConnectionChange: (connected) => this._setServerStatus(connected)
+            onConnectionChange: (connected) => this._onNetConnectionChange(connected),
+            onModes: (modes) => this._applyServerModes(modes),
+            onHit: (msg) => this._onPvpHit(msg)
         });
+        // Game-mode voting + PvP state (see the Game Modes menu + PvP toggle).
+        this._myVotes = { zombies: 0, cowboy: 0, cowgirl: 0 };
+        this._modeTally = {
+            zombies: { yes: 0, no: 0, on: false },
+            cowboy: { yes: 0, no: 0, on: false },
+            cowgirl: { yes: 0, no: 0, on: false }
+        };
+        this.pvpEnabled = true;       // true = fighter (default), false = spectator ghost
+        this._pvpHitCooldown = {};    // peerId -> next-allowed-hit timestamp
+        this._modesSynced = false;    // true once a vote-aware server confirms a tally
 
         // Add objects in the center of the world
         this.computer = this.physics.add.staticSprite(worldWidth / 2, worldHeight / 2, 'computer', 0).setScale(15).refreshBody();
@@ -253,6 +489,11 @@ export default class MainScene extends Phaser.Scene {
         this._spawnBombs();
 
         this.cameras.main.startFollow(this.player);
+        this.cameras.main.setBackgroundColor(this._mainBgColor());
+        // Phones show a lot less world at zoom 1 (small physical screen, often
+        // portrait) — zoom out a bit so there's enough room to see incoming
+        // threats/targets before they're right on top of you.
+        if (isLikelyMobileDevice()) this.cameras.main.setZoom(0.75);
 
         // Mini map camera (created early so extrusion layers can be ignored by it)
         const miniMapWidth = 150;
@@ -351,6 +592,12 @@ export default class MainScene extends Phaser.Scene {
             frames: [{ key: 'cowboy', frame: 4 }],
             frameRate: 1
         });
+        this.anims.create({
+            key: 'cowgirl-fly',
+            frames: this.anims.generateFrameNumbers('cowgirl', { start: 0, end: 5 }),
+            frameRate: 12,
+            repeat: -1
+        });
 
         // play animations
         this.orb.anims.play('aura');
@@ -439,6 +686,8 @@ export default class MainScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.plankGroup);
         // Zombies pressed against a plank gnaw through it over time.
         this.physics.add.collider(this.zombieGroup, this.plankGroup, this._zombieBitesPlank, null, this);
+        // The player can also chop their own planks back down with the axe.
+        this.physics.add.overlap(this.axe, this.plankGroup, this._axeHitsPlank, null, this);
 
         // --- Ranged slash (Hollow-Knight nail-slash projectile) ---
         // Fired with every swing; 2 hits kill a regular zombie.
@@ -596,7 +845,7 @@ export default class MainScene extends Phaser.Scene {
             document.body.appendChild(btn);
         }
         btn.textContent = '2D';
-        btn.setAttribute('aria-label', 'Toggle DOOM 3D first-person view');
+        btn.setAttribute('aria-label', 'Toggle DOOM 3D view');
         btn.addEventListener('click', () => {
             this.is3D = !this.is3D;
             this.sounds.toggle(this.is3D);
@@ -612,13 +861,13 @@ export default class MainScene extends Phaser.Scene {
 
             if (this.is3D) {
                 this.setActionHint(false);
-                // First time in first-person: explain the different controls.
+                // First time in 3D: explain the different controls.
                 if (!this._doomIntroShown) {
                     this._doomIntroShown = true;
                     const touch = this.isTouch();
                     this.showToast(
-                        touch ? 'FIRST-PERSON MODE\n◄ ► turn   ▲ ▼ walk\nHold CHOP to swing'
-                              : 'FIRST-PERSON MODE\n← → turn   ↑ ↓ walk\nHold F to chop',
+                        touch ? '3D MODE\n◄ ► turn   ▲ ▼ walk\nHold CHOP to swing'
+                              : '3D MODE\n← → turn   ↑ ↓ walk\nHold F to chop',
                         4200
                     );
                 }
@@ -691,88 +940,69 @@ export default class MainScene extends Phaser.Scene {
         this._doomPad = pad;
         this._hudEls.push(pad);
 
-        // --- "?" help button: reopens the tutorial ---
-        const help = document.createElement('button');
-        help.id = 'help-btn';
-        help.className = 'pixel-hud-btn';
-        help.textContent = '?';
-        help.setAttribute('aria-label', 'How to play');
-        help.addEventListener('click', () => this.showTutorial());
-        document.body.appendChild(help);
-        this._helpBtn = help;
-        this._hudEls.push(help);
+        // The help ("?") button and the SFX mute toggle now live INSIDE the
+        // gear/settings panel (see _renderSettings) rather than as their own
+        // HUD chips. Music was removed entirely. Kept as null so the language
+        // re-render + other guards stay happy.
+        this._helpBtn = null;
+        this._musicBtn = null;
+        this._sfxBtn = null;
 
-        // --- Music on/off toggle (bottom-left, right next to the "?") ---
-        const music = document.createElement('button');
-        music.id = 'music-btn';
-        music.className = 'pixel-hud-btn';
-        music.innerHTML = '<span class="music-icon"></span>';
-        music.setAttribute('aria-label', 'Toggle music');
-        // Reflect the current desired state (music starts on first user gesture).
-        music.classList.toggle('off', !this.sounds.musicWanted);
-        music.addEventListener('click', () => {
-            const on = this.sounds.toggleMusic();
-            music.classList.toggle('off', !on);
-        });
-        document.body.appendChild(music);
-        this._musicBtn = music;
-        this._hudEls.push(music);
+        // --- Bottom-left HUD row: gear, exit, then game modes — a single flex
+        // container so the buttons lay themselves out left-to-right with no
+        // hardcoded per-button pixel offsets (which used to overlap once text
+        // width varied by language). Gear leads the row; exit sits right of it. ---
+        const bottomleft = document.createElement('div');
+        bottomleft.id = 'bottomleft-hud';
+        document.body.appendChild(bottomleft);
+        this._hudEls.push(bottomleft);
 
-        // --- SFX mute toggle (footsteps/chop/smash/etc.) — independent of
-        // music, starts muted the same way. Sits right after the music button. ---
-        const sfx = document.createElement('button');
-        sfx.id = 'sfx-btn';
-        sfx.className = 'pixel-hud-btn';
-        sfx.innerHTML = '<span class="sfx-icon"></span>';
-        sfx.setAttribute('aria-label', 'Mute sound effects');
-        sfx.classList.toggle('off', this.sounds.sfxMuted);
-        sfx.addEventListener('click', () => {
-            const muted = this.sounds.toggleSfx();
-            sfx.classList.toggle('off', muted);
-        });
-        document.body.appendChild(sfx);
-        this._sfxBtn = sfx;
-        this._hudEls.push(sfx);
+        // --- Gear icon: opens the settings panel (theme + language) ---
+        const gear = document.createElement('button');
+        gear.id = 'gear-btn';
+        gear.className = 'pixel-hud-btn';
+        gear.innerHTML = '<span class="gear-icon"></span>';
+        gear.setAttribute('aria-label', this.t('gearAria'));
+        gear.addEventListener('click', () => this.showSettings());
+        bottomleft.appendChild(gear);
+        this._gearBtn = gear;
 
         // --- Exit button: clears the saved "who are you?" choice + reloads, so
-        // the visitor gate shows again. Sits right after the SFX button. ---
+        // the visitor gate shows again. ---
         const exit = document.createElement('button');
         exit.id = 'exit-btn';
         exit.className = 'pixel-hud-btn';
-        exit.textContent = 'exit';
-        exit.setAttribute('aria-label', 'Exit and reset visitor choice');
+        exit.textContent = this.t('exitLabel');
+        exit.setAttribute('aria-label', this.t('exitAria'));
         exit.addEventListener('click', () => {
             try { localStorage.removeItem('visitorType'); } catch (e) {}
             window.location.reload();
         });
-        document.body.appendChild(exit);
+        bottomleft.appendChild(exit);
         this._exitBtn = exit;
-        this._hudEls.push(exit);
 
-        // --- "zombies?" / "cowboy?" toggles, continuing the bottom row ---
+        // --- "GAME MODES" button: opens the modes menu (zombies / cowboy /
+        // cowgirl), where active players vote each mode on or off. Replaces the
+        // three separate always-visible toggle chips. ---
         const extra = document.createElement('div');
         extra.id = 'extra-btns';
 
-        const zom = document.createElement('button');
-        zom.id = 'zombie-btn';
-        zom.className = 'pixel-hud-btn';
-        zom.textContent = 'zombies?';
-        zom.setAttribute('aria-label', 'Toggle zombies');
-        zom.addEventListener('click', () => this.setZombiesEnabled(!this.zombiesEnabled));
-        extra.appendChild(zom);
-        this._zombieBtn = zom;
+        const modesBtn = document.createElement('button');
+        modesBtn.id = 'modes-btn';
+        modesBtn.className = 'pixel-hud-btn';
+        modesBtn.textContent = this.t('gameModesLabel');
+        modesBtn.setAttribute('aria-label', this.t('gameModesAria'));
+        modesBtn.addEventListener('click', () => this.showGameModes());
+        extra.appendChild(modesBtn);
+        this._modesBtn = modesBtn;
+        // Row-toggle refs the old code updated now point at the menu rows; the
+        // Game Modes menu builds + wires them (see _buildGameModes).
+        this._zombieBtn = null;
+        this._cowboyBtn = null;
+        this._cowgirlBtn = null;
 
-        const cow = document.createElement('button');
-        cow.id = 'cowboy-btn';
-        cow.className = 'pixel-hud-btn';
-        cow.textContent = 'cowboy?';
-        cow.setAttribute('aria-label', 'Toggle the cowboy duel');
-        cow.addEventListener('click', () => this.setCowboyEnabled(!this.cowboyEnabled));
-        extra.appendChild(cow);
-        this._cowboyBtn = cow;
-
-        document.body.appendChild(extra);
-        this._hudEls.push(extra);
+        bottomleft.appendChild(extra);
+        this._buildGameModes();
 
         // --- Top-left HUD: presence-server status + live FPS readout,
         // side by side so one's text length never nudges the other. ---
@@ -781,7 +1011,7 @@ export default class MainScene extends Phaser.Scene {
 
         const srv = document.createElement('div');
         srv.id = 'server-status';
-        srv.textContent = 'server: inactive';
+        srv.textContent = isLikelyMobileDevice() ? 'srv: off' : 'server: inactive';
         topleft.appendChild(srv);
         this._serverStatusEl = srv;
 
@@ -791,6 +1021,17 @@ export default class MainScene extends Phaser.Scene {
         topleft.appendChild(fps);
         this._fpsEl = fps;
         this._fpsUpdateAt = 0;
+
+        // --- PvP / spectator toggle, right next to the FPS readout. Default is
+        // FIGHT: you + anyone else who's also fighting can hit each other.
+        // Toggle to SPECTATE to become a harmless ghost to other players. ---
+        const pvp = document.createElement('button');
+        pvp.id = 'pvp-btn';
+        pvp.setAttribute('aria-label', this.t('pvpAria'));
+        pvp.addEventListener('click', () => this.setPvpEnabled(!this.pvpEnabled));
+        topleft.appendChild(pvp);
+        this._pvpBtn = pvp;
+        this._updatePvpBtn();
 
         document.body.appendChild(topleft);
         this._hudEls.push(topleft);
@@ -824,7 +1065,7 @@ export default class MainScene extends Phaser.Scene {
         const axeTool = document.createElement('button');
         axeTool.id = 'axe-tool-btn';
         axeTool.className = 'pixel-hud-btn';
-        axeTool.setAttribute('aria-label', 'Switch to the axe (1)');
+        axeTool.setAttribute('aria-label', this.t('axeToolAria'));
         axeTool.innerHTML = '<span class="axe-icon"></span>';
         axeTool.addEventListener('click', () => this.setTool('axe'));
         toolRow.appendChild(axeTool);
@@ -833,7 +1074,7 @@ export default class MainScene extends Phaser.Scene {
         const gunTool = document.createElement('button');
         gunTool.id = 'axegun-tool-btn';
         gunTool.className = 'pixel-hud-btn';
-        gunTool.setAttribute('aria-label', 'Switch to the axe gun (2)');
+        gunTool.setAttribute('aria-label', this.t('axeGunToolAria'));
         gunTool.innerHTML = '<span class="axegun-icon"></span>';
         gunTool.addEventListener('click', () => this.setTool('axegun'));
         toolRow.appendChild(gunTool);
@@ -842,7 +1083,7 @@ export default class MainScene extends Phaser.Scene {
         const plank = document.createElement('button');
         plank.id = 'plank-tool-btn';
         plank.className = 'pixel-hud-btn';
-        plank.setAttribute('aria-label', 'Switch to planks (3)');
+        plank.setAttribute('aria-label', this.t('plankToolAria'));
         const plankIcon = document.createElement('div');
         plankIcon.className = 'plank-icon';
         const plankVal = document.createElement('span');
@@ -903,8 +1144,23 @@ export default class MainScene extends Phaser.Scene {
         this._cscoreVal = cscoreVal;
         this._hudEls.push(cscore);
 
-        // --- Tutorial popup + toast ---
+        // --- Cowgirl-kill counter (shown while the cowgirl mode is on) ---
+        const gscore = document.createElement('div');
+        gscore.id = 'gscore-hud';
+        const gscoreIcon = document.createElement('div');
+        gscoreIcon.className = 'gscore-icon';
+        const gscoreVal = document.createElement('span');
+        gscoreVal.className = 'gscore-val';
+        gscoreVal.textContent = this.cowgirlKills;
+        gscore.appendChild(gscoreIcon);
+        gscore.appendChild(gscoreVal);
+        document.body.appendChild(gscore);
+        this._gscoreVal = gscoreVal;
+        this._hudEls.push(gscore);
+
+        // --- Tutorial popup + settings popup + toast ---
         this._buildTutorial();
+        this._buildSettings();
         const toast = document.createElement('div');
         toast.id = 'hud-toast';
         document.body.appendChild(toast);
@@ -921,35 +1177,38 @@ export default class MainScene extends Phaser.Scene {
     _buildTutorial() {
         const overlay = document.createElement('div');
         overlay.id = 'tutorial-overlay';
-        const touch = this.isTouch();
+        document.body.appendChild(overlay);
+        this._tutorial = overlay;
+        this._hudEls.push(overlay);
+        this._renderTutorial();
+    }
 
+    // Rebuilt (not just re-translated) on language change, since innerHTML
+    // replacement drops the button's listener — re-bind it every time.
+    _renderTutorial() {
+        const overlay = this._tutorial;
+        if (!overlay) return;
+        const wasOpen = overlay.classList.contains('open');
+        const touch = this.isTouch();
         const axe = '<span class="axe-icon"></span>';
         const moveKey = touch ? 'TAP' : 'WASD';
-        const moveText = touch ? 'Tap anywhere on the ground to walk there' : 'Move with WASD or the arrow keys';
-        const chopText = touch
-            ? `Stand next to a tree, ghost, computer or orb and hold the ${axe} <b>CHOP</b> button. It glows when you’re close enough.`
-            : `Stand next to something and hold <b>F</b> (or the ${axe} button) to chop. It glows when you’re in range.`;
-        const doomText = touch
-            ? 'Tap <b>3D</b> for first-person. Use the <b>&#9650;&#9660;&#9668;&#9658;</b> pad to turn &amp; walk, then hold CHOP.'
-            : 'Tap <b>3D</b> for first-person DOOM view. Turn/walk with the arrow keys, chop with <b>F</b>.';
-        const escText = touch
-            ? 'Chopping a target opens its page. Tap the <b>ESC</b> button (bottom-right) to come back.'
-            : 'Chopping a target opens its page. Press <b>ESC</b> (or the bottom-right button) to come back.';
+        const moveText = touch ? this.t('tutMoveTouch') : this.t('tutMoveDesktop');
+        const chopText = (touch ? this.t('tutChopTouch') : this.t('tutChopDesktop')).replace('{axe}', axe);
+        const doomText = touch ? this.t('tutDoomTouch') : this.t('tutDoomDesktop');
+        const escText = touch ? this.t('tutEscTouch') : this.t('tutEscDesktop');
 
         overlay.innerHTML = `
             <div class="tutorial-card">
-                <h2>${axe} HOW TO PLAY</h2>
+                <h2>${this.t('tutTitle').replace('{axe}', axe)}</h2>
                 <div class="tutorial-row"><span class="tutorial-key">${moveKey}</span><span>${moveText}</span></div>
                 <div class="tutorial-row"><span class="tutorial-key">${axe}</span><span>${chopText}</span></div>
                 <div class="tutorial-row"><span class="tutorial-key">3D</span><span>${doomText}</span></div>
                 <div class="tutorial-row"><span class="tutorial-key">ESC</span><span>${escText}</span></div>
-                <button class="tutorial-start">LET'S GO</button>
-                <div class="tutorial-note">Chop the trees, ghosts, computer &amp; orb to explore Bruno’s projects. Reopen this anytime with the <b>?</b> button.</div>
+                <button class="tutorial-start">${this.t('tutStart')}</button>
+                <div class="tutorial-note">${this.t('tutNote')}</div>
             </div>`;
         overlay.querySelector('.tutorial-start').addEventListener('click', () => this.hideTutorial());
-        document.body.appendChild(overlay);
-        this._tutorial = overlay;
-        this._hudEls.push(overlay);
+        overlay.classList.toggle('open', wasOpen);
     }
 
     showTutorial() {
@@ -965,6 +1224,332 @@ export default class MainScene extends Phaser.Scene {
         // move-to-begin image and unblock gameplay immediately.
         if (this.instructionsImage) this.instructionsImage.setVisible(false);
         this.playerMoved = true;
+    }
+
+    // ---- Settings modal (gear icon): light/dark theme + language ----
+
+    _buildSettings() {
+        const overlay = document.createElement('div');
+        overlay.id = 'settings-overlay';
+        document.body.appendChild(overlay);
+        this._settings = overlay;
+        this._hudEls.push(overlay);
+        this._renderSettings();
+    }
+
+    // Rebuilt on open and on every theme/language change so the active
+    // state + button labels always reflect the current choice.
+    _renderSettings() {
+        const overlay = this._settings;
+        if (!overlay) return;
+        const wasOpen = overlay.classList.contains('open');
+        const LANGS = [['en', 'EN'], ['es', 'ES'], ['zh', '中文'], ['fr', 'FR']];
+        overlay.innerHTML = `
+            <div class="settings-card">
+                <h2>${this.t('settingsTitle')}</h2>
+                <div class="settings-section">
+                    <div class="settings-label">${this.t('themeLabel')}</div>
+                    <div class="settings-choices">
+                        <button class="settings-choice-btn${this.theme === 'dark' ? ' active' : ''}" data-theme="dark">${this.t('themeDark')}</button>
+                        <button class="settings-choice-btn${this.theme === 'light' ? ' active' : ''}" data-theme="light">${this.t('themeLight')}</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-label">${this.t('languageLabel')}</div>
+                    <div class="settings-choices">
+                        ${LANGS.map(([code, label]) => `<button class="settings-choice-btn${this.lang === code ? ' active' : ''}" data-lang="${code}">${label}</button>`).join('')}
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-label">${this.t('soundLabel')}</div>
+                    <div class="settings-choices">
+                        <button class="settings-choice-btn${!this.sounds.sfxMuted ? ' active' : ''}" data-sfx="1">${this.t('sfxOn')}</button>
+                        <button class="settings-choice-btn${this.sounds.sfxMuted ? ' active' : ''}" data-sfx="0">${this.t('sfxOff')}</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-label">${this.t('doomPanelLabel')}</div>
+                    <div id="doom-controls-slot"></div>
+                </div>
+                <button class="settings-help">${this.t('helpLabel')}</button>
+                <button class="settings-close">${this.t('settingsClose')}</button>
+            </div>`;
+        overlay.querySelectorAll('[data-theme]').forEach(btn => {
+            btn.addEventListener('click', () => this._applyTheme(btn.dataset.theme));
+        });
+        overlay.querySelectorAll('[data-lang]').forEach(btn => {
+            btn.addEventListener('click', () => this._applyLanguage(btn.dataset.lang));
+        });
+        overlay.querySelectorAll('[data-sfx]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const wantMuted = btn.dataset.sfx === '0';
+                if (this.sounds.sfxMuted !== wantMuted) this.sounds.toggleSfx();
+                this._renderSettings();
+            });
+        });
+        // The live DOOM sliders (src/utils/DoomView.js) are a single DOM node
+        // built once — rebuilding overlay.innerHTML above just detached it
+        // from the DOM, so re-parent the same node rather than recreate it
+        // (recreating would drop its slider listeners).
+        if (this.doomView) overlay.querySelector('#doom-controls-slot').appendChild(this.doomView.panel);
+        overlay.querySelector('.settings-help').addEventListener('click', () => {
+            this.hideSettings();
+            this.showTutorial();
+        });
+        overlay.querySelector('.settings-close').addEventListener('click', () => this.hideSettings());
+        overlay.classList.toggle('open', wasOpen);
+    }
+
+    showSettings() {
+        if (this._settings) this._settings.classList.add('open');
+    }
+
+    hideSettings() {
+        if (this._settings) this._settings.classList.remove('open');
+    }
+
+    // ===== Game Modes menu (voting) =====
+    // The three opt-in modes now live behind one "GAME MODES" button. Each row
+    // has a ✓ vote (left) and ✗ vote (right) with live counts; active players
+    // vote and the majority decides whether the mode is on for EVERYONE.
+    _buildGameModes() {
+        const overlay = document.createElement('div');
+        overlay.id = 'modes-overlay';
+        document.body.appendChild(overlay);
+        this._modesOverlay = overlay;
+        this._hudEls.push(overlay);
+
+        const modes = ['zombies', 'cowboy', 'cowgirl'];
+        const labelKey = { zombies: 'zombiesLabel', cowboy: 'cowboyLabel', cowgirl: 'cowgirlLabel' };
+
+        const card = document.createElement('div');
+        card.className = 'modes-card';
+        const h2 = document.createElement('h2');
+        h2.className = 'modes-title';
+        h2.textContent = this.t('modesTitle');
+        card.appendChild(h2);
+        const note = document.createElement('p');
+        note.className = 'modes-note';
+        note.textContent = this.t('modesNote');
+        card.appendChild(note);
+
+        const list = document.createElement('div');
+        list.className = 'modes-list';
+        this._modeRows = {};
+        for (const mode of modes) {
+            const row = document.createElement('div');
+            row.className = 'mode-row';
+
+            const yesBtn = document.createElement('button');
+            yesBtn.className = 'vote-btn yes';
+            yesBtn.setAttribute('aria-label', this.t('voteYesAria'));
+            yesBtn.innerHTML = '<span class="vote-mark">✓</span><span class="vote-count yes-count">0</span>';
+            yesBtn.addEventListener('click', () => this._castVote(mode, 1));
+
+            const name = document.createElement('div');
+            name.className = 'mode-name';
+            name.innerHTML = `<span class="mode-name-text">${this.t(labelKey[mode])}</span><span class="mode-on-badge">${this.t('modeOn')}</span>`;
+
+            const noBtn = document.createElement('button');
+            noBtn.className = 'vote-btn no';
+            noBtn.setAttribute('aria-label', this.t('voteNoAria'));
+            noBtn.innerHTML = '<span class="vote-mark">✗</span><span class="vote-count no-count">0</span>';
+            noBtn.addEventListener('click', () => this._castVote(mode, -1));
+
+            row.appendChild(yesBtn);
+            row.appendChild(name);
+            row.appendChild(noBtn);
+            list.appendChild(row);
+            this._modeRows[mode] = {
+                el: row, yesBtn, noBtn,
+                yesCount: yesBtn.querySelector('.yes-count'),
+                noCount: noBtn.querySelector('.no-count'),
+                nameText: name.querySelector('.mode-name-text')
+            };
+        }
+        card.appendChild(list);
+
+        const close = document.createElement('button');
+        close.className = 'modes-close';
+        close.textContent = this.t('settingsClose');
+        close.addEventListener('click', () => this.hideGameModes());
+        card.appendChild(close);
+
+        overlay.appendChild(card);
+        // Click the dark backdrop (not the card itself) to dismiss, same as
+        // tapping outside any other modal-style popup.
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) this.hideGameModes();
+        });
+        this._updateModesUI();
+    }
+
+    // On (re)connect, push our current votes + PvP state so the server's tally
+    // reflects choices we made while it was unreachable (or before a reload).
+    _onNetConnectionChange(connected) {
+        this._setServerStatus(connected);
+        if (!connected) { this._modesSynced = false; return; }
+        for (const mode of ['zombies', 'cowboy', 'cowgirl']) {
+            if (this._myVotes[mode]) this._network.sendVote(mode, this._myVotes[mode]);
+        }
+        if (this.pvpEnabled) this._network.sendPvp(true, false);
+    }
+
+    showGameModes() { if (this._modesOverlay) this._modesOverlay.classList.add('open'); }
+    hideGameModes() { if (this._modesOverlay) this._modesOverlay.classList.remove('open'); }
+
+    // Cast (or, if repeated, clear) our ✓/✗ vote on one mode. We always tell the
+    // server (it re-tallies across every active player and echoes the
+    // authoritative on/off via _applyServerModes). Until a vote-aware server has
+    // actually confirmed a tally, we also decide locally so solo play — and the
+    // window before the updated server is deployed — still works instantly.
+    _castVote(mode, val) {
+        this._myVotes[mode] = (this._myVotes[mode] === val) ? 0 : val;
+        if (this._network) this._network.sendVote(mode, this._myVotes[mode]);
+        if (!this._modesSynced) {
+            this._modeTally[mode] = {
+                yes: this._myVotes[mode] === 1 ? 1 : 0,
+                no: this._myVotes[mode] === -1 ? 1 : 0,
+                on: this._myVotes[mode] === 1
+            };
+            this._setModeEnabled(mode, this._myVotes[mode] === 1);
+        }
+        this._updateModesUI();
+    }
+
+    // Server told us the live vote tally + resulting on/off for every mode. Once
+    // this fires, the server is authoritative (it counts every player, including
+    // us) and overrides any optimistic local state.
+    _applyServerModes(modes) {
+        this._modesSynced = true;
+        for (const mode of ['zombies', 'cowboy', 'cowgirl']) {
+            if (!modes[mode]) continue;
+            this._modeTally[mode] = modes[mode];
+            this._setModeEnabled(mode, !!modes[mode].on);
+        }
+        this._updateModesUI();
+    }
+
+    // Enable/disable a mode by name, only when it actually changed (the setters
+    // spawn/despawn entities, so calling them redundantly every tick is wasteful).
+    _setModeEnabled(mode, on) {
+        if (mode === 'zombies' && on !== this.zombiesEnabled) this.setZombiesEnabled(on);
+        else if (mode === 'cowboy' && on !== this.cowboyEnabled) this.setCowboyEnabled(on);
+        else if (mode === 'cowgirl' && on !== this.cowgirlEnabled) this.setCowgirlEnabled(on);
+    }
+
+    // Repaint vote counts, my-vote highlights and the ON badges.
+    _updateModesUI() {
+        if (this._modeRows) {
+            const state = { zombies: this.zombiesEnabled, cowboy: this.cowboyEnabled, cowgirl: this.cowgirlEnabled };
+            for (const mode of ['zombies', 'cowboy', 'cowgirl']) {
+                const row = this._modeRows[mode];
+                if (!row) continue;
+                const t = this._modeTally[mode] || { yes: 0, no: 0, on: false };
+                row.yesCount.textContent = t.yes;
+                row.noCount.textContent = t.no;
+                const my = this._myVotes[mode];
+                row.yesBtn.classList.toggle('mine', my === 1);
+                row.noBtn.classList.toggle('mine', my === -1);
+                row.el.classList.toggle('on', !!state[mode]);
+            }
+        }
+        if (this._modesBtn) this._modesBtn.classList.toggle('active', this._anyGameModeOn());
+    }
+
+    // ===== PvP / spectator =====
+    // Default is spectator (harmless ghost). Toggle on to become a fighter:
+    // you can strike — and be struck by — any other player who's also fighting.
+    setPvpEnabled(on) {
+        this.pvpEnabled = on;
+        this._updatePvpBtn();
+        if (this._network) this._network.sendPvp(on, !on); // spectator = not fighting
+        // Refresh peer look (solid vs translucent) right away.
+        for (const rp of (this.remotePlayers || [])) {
+            const fightable = rp.pvp && !rp.spectator && this.pvpEnabled;
+            rp.sprite.setAlpha(fightable ? 0.95 : 0.6);
+        }
+        this.showToast(on ? this.t('toastPvpOn') : this.t('toastPvpOff'), 2200);
+    }
+
+    _updatePvpBtn() {
+        if (!this._pvpBtn) return;
+        this._pvpBtn.textContent = this.pvpEnabled ? this.t('pvpFight') : this.t('pvpSpectate');
+        this._pvpBtn.classList.toggle('on', this.pvpEnabled);
+        this._pvpBtn.setAttribute('aria-label', this.t('pvpAria'));
+    }
+
+    // Another fighter's hit was forwarded to us — take the damage locally.
+    _onPvpHit(msg) {
+        if (!this.pvpEnabled) return; // safety: server shouldn't forward, but guard
+        const dmg = Math.max(0, Math.min(3, Number(msg && msg.dmg) || 0));
+        if (dmg <= 0) return;
+        this.cameras.main.shake(120, 0.008);
+        this.damage(dmg);
+    }
+
+    // Main-world camera background: black in dark mode, dark grey in light mode
+    // (light mode used to leave the world pitch black, which looked unfinished).
+    _mainBgColor() {
+        return this.theme === 'light' ? '#3a3a3a' : '#000000';
+    }
+
+    _applyTheme(theme) {
+        if (theme !== 'light' && theme !== 'dark') return;
+        this.theme = theme;
+        try { localStorage.setItem('theme', theme); } catch (e) {}
+        document.body.classList.toggle('theme-light', theme === 'light');
+        // Recolour the live world unless we're inside a sub-world (which owns
+        // its own tinted background).
+        if (!this.inOhs && this.cameras && this.cameras.main) {
+            this.cameras.main.setBackgroundColor(this._mainBgColor());
+        }
+        this._renderSettings();
+    }
+
+    // Re-renders every piece of currently-built UI chrome that carries
+    // translated text: HUD button labels/aria-labels, the tutorial card,
+    // and the settings panel itself. In-flight toasts aren't retranslated
+    // (they're transient); new ones already pick up the new language via t().
+    _applyLanguage(lang) {
+        if (!I18N[lang]) return;
+        this.lang = lang;
+        try { localStorage.setItem('lang', lang); } catch (e) {}
+
+        if (this._helpBtn) this._helpBtn.setAttribute('aria-label', this.t('helpAria'));
+        if (this._musicBtn) this._musicBtn.setAttribute('aria-label', this.t('musicAria'));
+        if (this._sfxBtn) this._sfxBtn.setAttribute('aria-label', this.t('sfxAria'));
+        if (this._exitBtn) {
+            this._exitBtn.textContent = this.t('exitLabel');
+            this._exitBtn.setAttribute('aria-label', this.t('exitAria'));
+        }
+        if (this._gearBtn) this._gearBtn.setAttribute('aria-label', this.t('gearAria'));
+        if (this._modesBtn) {
+            this._modesBtn.textContent = this.t('gameModesLabel');
+            this._modesBtn.setAttribute('aria-label', this.t('gameModesAria'));
+        }
+        this._updatePvpBtn();
+        // Re-label the game-modes menu (title, note, mode names, ON badges).
+        if (this._modesOverlay) {
+            const titleEl = this._modesOverlay.querySelector('.modes-title');
+            if (titleEl) titleEl.textContent = this.t('modesTitle');
+            const noteEl = this._modesOverlay.querySelector('.modes-note');
+            if (noteEl) noteEl.textContent = this.t('modesNote');
+            const closeEl = this._modesOverlay.querySelector('.modes-close');
+            if (closeEl) closeEl.textContent = this.t('settingsClose');
+            const labelKey = { zombies: 'zombiesLabel', cowboy: 'cowboyLabel', cowgirl: 'cowgirlLabel' };
+            for (const mode of ['zombies', 'cowboy', 'cowgirl']) {
+                const row = this._modeRows && this._modeRows[mode];
+                if (row && row.nameText) row.nameText.textContent = this.t(labelKey[mode]);
+            }
+        }
+        if (this._axeToolBtn) this._axeToolBtn.setAttribute('aria-label', this.t('axeToolAria'));
+        if (this._axeGunToolBtn) this._axeGunToolBtn.setAttribute('aria-label', this.t('axeGunToolAria'));
+        if (this._plankHud) this._plankHud.setAttribute('aria-label', this.t('plankToolAria'));
+        if (this.tool) this._updateToolHud();
+
+        this._renderTutorial();
+        this._renderSettings();
     }
 
     // Toggle the "in range" state of the action button. While active it streams
@@ -1080,11 +1665,72 @@ export default class MainScene extends Phaser.Scene {
         }
         this._renderHearts();
 
-        // Out of hearts → the player is dead. Let the final heart pop + the
-        // launch play out, then reload the whole site for a fresh start.
+        // Out of hearts → the player is dead. Let the final heart pop play out,
+        // then raise the GAME OVER screen (restart / exit).
         if (this.health === 0) {
-            setTimeout(() => window.location.reload(), 1100);
+            setTimeout(() => this._showGameOver(), 700);
         }
+    }
+
+    // Full-screen GAME OVER overlay. Under the title sit two buttons: EXIT
+    // (left, resets the visitor gate) and RESTART? (right, rainbow-glowing,
+    // with a 5s countdown that auto-sends the player back to the 2D world).
+    _showGameOver() {
+        if (this._gameOverEl) return;
+        this._isGameOver = true; // freezes update() — see the check at its top
+        this.player.setVelocity(0, 0);
+        // Dying with the settings/modes/tutorial popup open (e.g. a PvP hit
+        // lands while you're mid-menu) would otherwise leave it open behind
+        // the game-over overlay — close everything so it's a clean screen.
+        this.hideSettings();
+        this.hideGameModes();
+        if (this._tutorial) this._tutorial.classList.remove('open');
+        document.body.classList.add('game-over-open'); // hides the gameplay HUD
+        const overlay = document.createElement('div');
+        overlay.id = 'game-over';
+
+        const title = document.createElement('div');
+        title.id = 'game-over-title';
+        title.textContent = this.t('gameOverLabel');
+        overlay.appendChild(title);
+
+        const row = document.createElement('div');
+        row.id = 'game-over-btns';
+
+        // RESTART? — rainbow-glow, 5s auto-countdown → reload straight back into
+        // the 2D world (visitor choice kept, so the gate is skipped).
+        const restart = document.createElement('button');
+        restart.id = 'restart-btn';
+        restart.setAttribute('aria-label', this.t('restartAria'));
+        let secs = 5;
+        const paint = () => { restart.innerHTML = `${this.t('restartLabel')} <span class="restart-secs">${secs}</span>`; };
+        paint();
+        const goRestart = () => { clearInterval(this._gameOverTimer); window.location.reload(); };
+        restart.addEventListener('click', goRestart);
+        this._gameOverTimer = setInterval(() => {
+            secs -= 1;
+            paint();
+            if (secs <= 0) goRestart();
+        }, 1000);
+
+        // EXIT — clear the saved "who are you?" choice + reload → visitor gate.
+        const exit = document.createElement('button');
+        exit.id = 'game-over-exit';
+        exit.textContent = this.t('exitLabel');
+        exit.setAttribute('aria-label', this.t('exitGameAria'));
+        exit.addEventListener('click', () => {
+            clearInterval(this._gameOverTimer);
+            try { localStorage.removeItem('visitorType'); } catch (e) {}
+            window.location.reload();
+        });
+
+        // DOM order: EXIT first (left), then RESTART? (right).
+        row.appendChild(exit);
+        row.appendChild(restart);
+
+        overlay.appendChild(row);
+        document.body.appendChild(overlay);
+        this._gameOverEl = overlay;
     }
 
     // Legacy single-heart hit (bombs, regular zombies).
@@ -1142,6 +1788,13 @@ export default class MainScene extends Phaser.Scene {
     }
 
     // Brief self-dismissing pixel message near the top of the screen.
+    // i18n lookup — falls back to English, then the raw key, so a missing
+    // translation never renders blank.
+    t(key) {
+        const table = I18N[this.lang] || I18N.en;
+        return table[key] ?? I18N.en[key] ?? key;
+    }
+
     showToast(message, ms = 3000) {
         if (!this._toast) return;
         this._toast.textContent = message;      // \n in the message wraps via white-space
@@ -1157,14 +1810,20 @@ export default class MainScene extends Phaser.Scene {
         this._stopTutorialParticles();
         if (this._hudEls) this._hudEls.forEach(el => el.remove());
         this._hudEls = [];
-        document.body.classList.remove('hud-ready', 'touch', 'zombies-on', 'cowboy-on');
+        document.body.classList.remove('hud-ready', 'touch', 'zombies-on', 'cowboy-on', 'cowgirl-on');
     }
 
     // Reflects NetworkManager's live WebSocket state — "active" means the
     // presence server (the EC2 Spot box) is actually up and reachable right now.
+    // Phones get the short form: "server: active" is wide enough at any
+    // legible font size to still run into the hearts/minimap cluster on the
+    // right, even stacked in its own row.
     _setServerStatus(connected) {
         if (!this._serverStatusEl) return;
-        this._serverStatusEl.textContent = connected ? 'server: active' : 'server: inactive';
+        const text = isLikelyMobileDevice()
+            ? (connected ? 'srv: on' : 'srv: off')
+            : (connected ? 'server: active' : 'server: inactive');
+        this._serverStatusEl.textContent = text;
         this._serverStatusEl.classList.toggle('active', connected);
         this._serverStatusEl.classList.toggle('inactive', !connected);
     }
@@ -1275,7 +1934,9 @@ export default class MainScene extends Phaser.Scene {
         const now = this.time.now;
         const check = (justDown, dir) => {
             if (!justDown) return;
-            if (now - (this._dashKeyDownAt[dir] || 0) <= this.DASH_WINDOW && now >= this._dashCooldownUntil) {
+            // Roped up by the cowgirl's lasso: dashing is off the table.
+            if (now - (this._dashKeyDownAt[dir] || 0) <= this.DASH_WINDOW && now >= this._dashCooldownUntil
+                && now >= this._lassoedUntil) {
                 this._startDash(dir);
             }
             this._dashKeyDownAt[dir] = now;
@@ -1293,7 +1954,7 @@ export default class MainScene extends Phaser.Scene {
         this._dashCooldownUntil = now + this.DASH_COOLDOWN;
         this._dashTrailAt = 0;
         this._dashHitSet = new Set(); // enemies already shield-knocked this dash
-        if (!this.is3D) this.lastDirection = dir;
+        if (!this.is3D) { this.lastDirection = dir; this.facingDirection = dir; }
         this.sounds.dash();
         this.cameras.main.shake(60, 0.003);
         this._pixelBurst(this.player.x, this.player.y, {
@@ -1364,6 +2025,7 @@ export default class MainScene extends Phaser.Scene {
 
             const foes = [...this.zombies];
             if (this.cowboy && this.cowboy.active) foes.push(this.cowboy);
+            if (this.cowgirl && this.cowgirl.active) foes.push(this.cowgirl);
             for (const foe of foes) {
                 if (!foe || !foe.active || !foe.body || this._dashHitSet.has(foe)) continue;
                 const dx = foe.x - this.player.x, dy = foe.y - this.player.y;
@@ -1380,11 +2042,15 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
-    // Shoves a shield-struck enemy away along the dash direction and stuns
-    // it briefly so it doesn't just walk straight back into you.
+    // Shoves a shield-struck enemy away along the dash direction, stuns
+    // it briefly so it doesn't just walk straight back into you, and
+    // damages it same as a melee axe chop.
     _dashKnockback(foe, angle) {
         foe.setVelocity(Math.cos(angle) * this.DASH_KNOCKBACK_SPEED, Math.sin(angle) * this.DASH_KNOCKBACK_SPEED);
         foe._stunUntil = Math.max(foe._stunUntil || 0, this.time.now + this.DASH_KNOCKBACK_STUN);
+        if (foe === this.cowboy) this._damageCowboy(this.DASH_DAMAGE);
+        else if (foe === this.cowgirl) this._damageCowgirl(this.DASH_DAMAGE);
+        else this._damageZombie(foe, this.DASH_DAMAGE);
         this.sounds.smash();
         this.cameras.main.shake(160, 0.01);
         this._pixelBurst(foe.x, foe.y, {
@@ -1460,8 +2126,10 @@ export default class MainScene extends Phaser.Scene {
         if (fwd) { vx += Math.cos(this.doomAngle); vy += Math.sin(this.doomAngle); }
         if (back) { vx -= Math.cos(this.doomAngle); vy -= Math.sin(this.doomAngle); }
         const mag = Math.hypot(vx, vy);
-        // Zenith frenzy doubles first-person speed too.
-        const spd = s.moveSpeed * (this.time.now < this._zenithUntil ? 2.2 : 1);
+        // Zenith frenzy doubles first-person speed too; the cowgirl's lasso
+        // does the opposite.
+        let spd = s.moveSpeed * (this.time.now < this._zenithUntil ? 2.2 : 1);
+        if (this.time.now < this._lassoedUntil) spd *= 0.4;
         if (mag > 0) this.player.setVelocity((vx / mag) * spd, (vy / mag) * spd);
         else this.player.setVelocity(0, 0);
     }
@@ -1545,21 +2213,27 @@ export default class MainScene extends Phaser.Scene {
         for (const p of players) {
             let rp = this.remotePlayers.find(r => r.id === p.id);
             if (!rp) {
+                const tint = REMOTE_PLAYER_TINTS[p.num % REMOTE_PLAYER_TINTS.length];
                 const sprite = this.add.sprite(p.x, p.y, 'me', 0)
-                    .setScale(3).setDepth(5).setAlpha(0.6)
-                    .setTint(REMOTE_PLAYER_TINTS[p.num % REMOTE_PLAYER_TINTS.length]);
+                    .setScale(3).setDepth(5).setAlpha(0.6).setTint(tint);
                 const label = this.add.text(p.x, p.y - 60, `Player ${p.num}`, {
                     fontFamily: 'monospace', fontSize: '18px', fill: '#ffffff',
                     stroke: '#000000', strokeThickness: 3
                 }).setOrigin(0.5).setDepth(6);
-                rp = { id: p.id, sprite, label, targetX: p.x, targetY: p.y, dir: p.dir };
+                rp = { id: p.id, sprite, label, tint, targetX: p.x, targetY: p.y, dir: p.dir };
                 this.remotePlayers.push(rp);
             }
             rp.num = p.num;
             rp.targetX = p.x;
             rp.targetY = p.y;
             rp.dir = p.dir;
-            rp.label.setText(`Player ${p.num}`);
+            rp.pvp = !!p.pvp;
+            rp.spectator = !!p.spectator;
+            // A fightable peer (PvP on, not spectating) reads as solid; harmless
+            // ghosts stay translucent. Only when we're a fighter too, though.
+            const fightable = rp.pvp && !rp.spectator && this.pvpEnabled;
+            rp.sprite.setAlpha(fightable ? 0.95 : 0.6);
+            rp.label.setText(fightable ? `⚔ Player ${p.num}` : `Player ${p.num}`);
         }
     }
 
@@ -1581,6 +2255,41 @@ export default class MainScene extends Phaser.Scene {
             if (!rp.sprite.anims.currentAnim || rp.sprite.anims.currentAnim.key !== animKey) {
                 rp.sprite.play(animKey, true);
             }
+        }
+        this._pvpCheckHits();
+    }
+
+    // PvP: when we're a fighter (not spectating), test our live weapons — the
+    // melee axe body, ranged slashes and thrown axe-gun hatchets — against every
+    // fellow fighter's ghost. A landed hit is reported to the server, which
+    // forwards it so THAT player takes the damage on their own screen.
+    _pvpCheckHits() {
+        if (!this.pvpEnabled || this.inOhs || !this.remotePlayers || !this.remotePlayers.length) return;
+        const now = this.time.now;
+        for (const rp of this.remotePlayers) {
+            if (!rp.pvp || rp.spectator) continue;
+            if (now < (this._pvpHitCooldown[rp.id] || 0)) continue;
+            const bx = rp.sprite.x, by = rp.sprite.y;
+            let dmg = 0;
+            if (this.axe && this.axe.body && this.axe.body.enable &&
+                Phaser.Math.Distance.Between(this.axe.x, this.axe.y, bx, by) < 48) {
+                dmg = Math.max(dmg, 2);
+            }
+            for (const s of this.slashGroup.getChildren()) {
+                if (s.active && Phaser.Math.Distance.Between(s.x, s.y, bx, by) < 48) { dmg = Math.max(dmg, 1); break; }
+            }
+            for (const a of this.axeGunGroup.getChildren()) {
+                if (a.active && Phaser.Math.Distance.Between(a.x, a.y, bx, by) < 42) { dmg = Math.max(dmg, this.AXEGUN_DAMAGE); break; }
+            }
+            if (dmg <= 0) continue;
+            this._pvpHitCooldown[rp.id] = now + 400;
+            this._network.sendHit(rp.id, dmg);
+            // Local feedback on the struck ghost (the real HP change happens on
+            // their machine when the server forwards the hit).
+            this._pixelBurst(bx, by, { colors: [0xff2b2b, 0xffffff, 0xff8080], count: 12, minSpeed: 80, maxSpeed: 220, gravity: 300 });
+            rp.sprite.setTint(0xff5a5a);
+            this.time.delayedCall(120, () => { if (rp.sprite && rp.sprite.active) rp.sprite.setTint(rp.tint); });
+            this.sounds.smash();
         }
     }
 
@@ -1605,6 +2314,7 @@ export default class MainScene extends Phaser.Scene {
             ...this.remotePlayers.map(rp => rp.sprite),
         ];
         if (this.cowboy && this.cowboy.active) extras.push(this.cowboy);
+        if (this.cowgirl && this.cowgirl.active) extras.push(this.cowgirl);
         if (this.inOhs) {
             return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...this.zombies, ...extras]
                 .filter(e => e && e.active);
@@ -1622,6 +2332,7 @@ export default class MainScene extends Phaser.Scene {
     _hintTargets() {
         const foes = [...this.zombies];
         if (this.cowboy && this.cowboy.active) foes.push(this.cowboy);
+        if (this.cowgirl && this.cowgirl.active) foes.push(this.cowgirl);
         if (this.inOhs) {
             return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...foes];
         }
@@ -1629,6 +2340,12 @@ export default class MainScene extends Phaser.Scene {
     }
 
     update() {
+        // GAME OVER freezes the world in place — no movement, no input.
+        if (this._isGameOver) {
+            if (this.player && this.player.body) this.player.setVelocity(0, 0);
+            return;
+        }
+
         // Live FPS readout, top-left next to the server status. Throttled to
         // 4x/sec — the raw per-frame number jitters too much to read.
         const nowMs = this.time.now;
@@ -1647,6 +2364,8 @@ export default class MainScene extends Phaser.Scene {
         if (this.keyThree && Phaser.Input.Keyboard.JustDown(this.keyThree)) this.setTool('plank');
         this._updateZenith();
         this._updateCowboy();
+        this._updateCowgirl();
+        this._updateLasso();
 
         // DOOM (first-person) mode takes a completely separate render/control
         // path and skips all the top-down logic below.
@@ -1732,10 +2451,13 @@ export default class MainScene extends Phaser.Scene {
         // Player Movement — tap-to-move on touch, keys otherwise. Chopping is
         // now the dedicated on-screen ⚔ button, so movement no longer has to
         // guess whether a tap meant "walk" vs "swing".
-        // Zenith frenzy: the player rockets around while it lasts.
+        // Zenith frenzy: the player rockets around while it lasts. The
+        // cowgirl's lasso does the opposite — roped up and sluggish.
         const zenithOn = this.time.now < this._zenithUntil;
-        const maxSp = zenithOn ? this.maxSpeed * 2.2 : this.maxSpeed;
-        const accel = zenithOn ? this.acceleration * 2.4 : this.acceleration;
+        const lassoOn = this.time.now < this._lassoedUntil;
+        const slowMul = lassoOn ? 0.4 : 1;
+        const maxSp = (zenithOn ? this.maxSpeed * 2.2 : this.maxSpeed) * slowMul;
+        const accel = (zenithOn ? this.acceleration * 2.4 : this.acceleration) * slowMul;
 
         if (isLikelyMobileDevice() && this.mobilePlayerMove) {
             const dx = Math.round(this.touchTarget.x - this.player.x);
@@ -1772,6 +2494,7 @@ export default class MainScene extends Phaser.Scene {
                         this.lastDirection = 'up';
                     }
                 }
+                this.facingDirection = this.lastDirection;
             }
         } else {
             // Keyboard Input (Arrow keys or WASD)
@@ -1804,15 +2527,19 @@ export default class MainScene extends Phaser.Scene {
             if (cursors.left.isDown || this.wasd.A.isDown) {
                 player.play('left-me', true);
                 this.lastDirection = 'left';
+                this.facingDirection = 'left';
             } else if (cursors.right.isDown || this.wasd.D.isDown) {
                 player.play('right-me', true);
                 this.lastDirection = 'right';
+                this.facingDirection = 'right';
             } else if (cursors.up.isDown || this.wasd.W.isDown) {
                 player.play('up-me', true);
                 this.lastDirection = 'up';
+                this.facingDirection = 'up';
             } else if (cursors.down.isDown || this.wasd.S.isDown) {
                 player.play('down-me', true);
                 this.lastDirection = 'down';
+                this.facingDirection = 'down';
             } else {
                 player.play('idle-me', true);
             }
@@ -1847,49 +2574,29 @@ export default class MainScene extends Phaser.Scene {
             // Whoosh at swing start, then repeat while held. A pixelated slash
             // arc flashes in the air on each swing (Hollow-Knight style).
             const now = this.time.now;
+            const aim = this._aimAngle();      // point the swing at the cursor
             if (!this.axeWasActive || now - this.lastSwingAt > 450) {
                 this.sounds.swing();
                 this.lastSwingAt = now;
-                this.spawnSlash(this.lastDirection);
+                this.spawnSlash(aim);
             }
 
             // Hold to keep it whirling: constant angular speed, so the axe just
             // spins round and round the player for as long as the button's down.
             this.axeRotations = (this.axeRotations || 0) + 0.4;
             const sw = this.axeRotations;
-            const off = 10;
-            // The axe HEAD mirrors the player's facing: raw sprite's head points
-            // right, so facing right = no flip, facing left = flipX.
-            switch (this.lastDirection) {
-                case 'left':
-                    this.axe.setFlipX(true);
-                    this.axe.setFlipY(false);
-                    this.axe.setOrigin(1, 1);
-                    this.axe.setPosition(player.x + Math.cos(sw) * off, player.y - Math.sin(sw) * off);
-                    this.axe.rotation = -sw;
-                    break;
-                case 'up':
-                    this.axe.setFlipX(false);
-                    this.axe.setFlipY(false);
-                    this.axe.setOrigin(0.5, 1);
-                    this.axe.setPosition(player.x + Math.sin(sw) * off, player.y - Math.cos(sw) * off - 6);
-                    this.axe.rotation = sw;
-                    break;
-                case 'down':
-                    this.axe.setFlipX(false);
-                    this.axe.setFlipY(true);
-                    this.axe.setOrigin(0.5, 0);
-                    this.axe.setPosition(player.x - Math.sin(sw) * off, player.y + Math.cos(sw) * off + 6);
-                    this.axe.rotation = -sw;
-                    break;
-                default: // right (and idle)
-                    this.axe.setFlipX(false);
-                    this.axe.setFlipY(false);
-                    this.axe.setOrigin(0.5, 1);
-                    this.axe.setPosition(player.x + Math.cos(sw) * off, player.y + Math.sin(sw) * off);
-                    this.axe.rotation = sw;
-                    break;
-            }
+            // Reach the axe body OUT toward the cursor so it strikes whatever the
+            // player is aiming at — not just whichever way they last walked.
+            const reach = 34;
+            const ax = player.x + Math.cos(aim) * reach;
+            const ay = player.y + Math.sin(aim) * reach;
+            // The axe HEAD mirrors the aim: raw sprite's head points right, so
+            // aiming rightward = no flip, aiming leftward = flipX.
+            this.axe.setFlipX(Math.cos(aim) < 0);
+            this.axe.setFlipY(false);
+            this.axe.setOrigin(0.5, 1);
+            this.axe.setPosition(ax, ay);
+            this.axe.rotation = aim + Math.PI / 2 + Math.sin(sw) * 0.6; // wobble as it swings
             this.axe.setVisible(true);
             this.axe.body.enable = true;
         } else {
@@ -1972,7 +2679,7 @@ export default class MainScene extends Phaser.Scene {
                     this._treesTowardPlank = 0;
                     this.planks += 1;
                     if (this._plankVal) this._plankVal.textContent = this.planks;
-                    if (this.planks === 1) this.showToast('+1 PLANK!\nPress 3 (or tap the plank chip) to place it', 3200);
+                    if (this.planks === 1) this.showToast(this.t('toastPlankEarned'), 3200);
                 }
                 // Chopped the very last tree? The whole forest regrows.
                 if (this.trees.countActive(true) === 0) {
@@ -2126,22 +2833,24 @@ export default class MainScene extends Phaser.Scene {
     }
 
     // Pixelated slash arc that flashes in the air along the swing direction.
-    spawnSlash(dir) {
+    // Accepts either an aim angle (radians, from _aimAngle) or a legacy
+    // direction string ('left'/'right'/'up'/'down'). The slash arc + ranged
+    // projectile both fire along that angle so they track the cursor.
+    spawnSlash(aim) {
         if (!this.textures.exists('fxSlash')) return;
         const off = 42;
-        const map = {
-            right: { rot: 0, dx: off, dy: 0 },
-            left: { rot: Math.PI, dx: -off, dy: 0 },
-            up: { rot: -Math.PI / 2, dx: 0, dy: -off },
-            down: { rot: Math.PI / 2, dx: 0, dy: off },
-            none: { rot: 0, dx: off, dy: 0 }
-        };
-        const m = map[dir] || map.right;
+        let ang;
+        if (typeof aim === 'number') {
+            ang = aim;
+        } else {
+            const dirs = { right: 0, left: Math.PI, up: -Math.PI / 2, down: Math.PI / 2, none: 0 };
+            ang = dirs[aim] ?? 0;
+        }
+        const m = { rot: ang, dx: Math.cos(ang) * off, dy: Math.sin(ang) * off };
         // The slash is also the RANGED attack: launch a flying arc that
         // damages zombies/the cowboy (2 slash hits kill a regular zombie).
         // Locked unless the player is at FULL health — melee still works hurt.
-        const mag = Math.hypot(m.dx, m.dy) || 1;
-        this._tryFireSlash(m.dx / mag, m.dy / mag);
+        this._tryFireSlash(Math.cos(ang), Math.sin(ang));
         // A soft cyan under-glow + a bright white core, both sweeping through
         // the arc — reads as a crisp nail-slash flash.
         const glow = this.add.image(this.player.x + m.dx, this.player.y + m.dy, 'fxSlash')
@@ -2220,6 +2929,19 @@ export default class MainScene extends Phaser.Scene {
         });
     }
 
+    // True while any of the opt-in game modes (zombies / cowboy / cowgirl) is
+    // running — either toggled locally or enabled by the live majority vote.
+    _anyGameModeOn() {
+        return !!(this.zombiesEnabled || this.cowboyEnabled || this.cowgirlEnabled);
+    }
+
+    // How many chops it takes to open an entity's iframe/sub-page. Doubles
+    // (3 -> 6) while a game mode is on, so opening a project is a real commitment
+    // when the world is dangerous.
+    _entityChopsNeeded() {
+        return this._anyGameModeOn() ? 6 : 3;
+    }
+
     hitComputer(axe, computer) {
         if (!this.canChop) return;
         this.canChop = false;
@@ -2234,7 +2956,7 @@ export default class MainScene extends Phaser.Scene {
             y: { value: computer.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
             onComplete: () => {
                 this.computerChops++;
-                if (this.computerChops >= 3) {
+                if (this.computerChops >= this._entityChopsNeeded()) {
                     this.sounds.smash();
                     this.openSubPage('personalWebsite/index.html');
                 }
@@ -2263,7 +2985,7 @@ export default class MainScene extends Phaser.Scene {
             y: { value: school.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
             onComplete: () => {
                 this.ohsChops++;
-                if (this.ohsChops >= 3) { this.sounds.smash(); this.enterOhsWorld(); }
+                if (this.ohsChops >= this._entityChopsNeeded()) { this.sounds.smash(); this.enterOhsWorld(); }
             }
         });
         this.time.delayedCall(500, () => { this.canChop = true; }, [], this);
@@ -2283,7 +3005,7 @@ export default class MainScene extends Phaser.Scene {
             y: { value: school.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
             onComplete: () => {
                 this.brownChops++;
-                if (this.brownChops >= 3) { this.sounds.smash(); this.enterBrownWorld(); }
+                if (this.brownChops >= this._entityChopsNeeded()) { this.sounds.smash(); this.enterBrownWorld(); }
             }
         });
         this.time.delayedCall(500, () => { this.canChop = true; }, [], this);
@@ -2297,7 +3019,7 @@ export default class MainScene extends Phaser.Scene {
     setZombiesEnabled(on) {
         this.zombiesEnabled = on;
         document.body.classList.toggle('zombies-on', on);
-        if (this._zombieBtn) this._zombieBtn.classList.toggle('on', on);
+        if (this._updateModesUI) this._updateModesUI();
         if (on) {
             this._navDirty = true;
             for (let i = 0; i < 3; i++) this._spawnZombie();
@@ -2789,9 +3511,9 @@ export default class MainScene extends Phaser.Scene {
         this.tool = tool;
         this._updateToolHud();
         const messages = {
-            axe: 'AXE selected (1)',
-            axegun: 'AXE GUN selected (2)\nHold F / FIRE to spray',
-            plank: 'PLANK selected (3)\nF / PLANK places a wall',
+            axe: this.t('toastAxeSelected'),
+            axegun: this.t('toastGunSelected'),
+            plank: this.t('toastPlankSelected'),
         };
         this.showToast(messages[tool] || '', 1600);
     }
@@ -2806,9 +3528,9 @@ export default class MainScene extends Phaser.Scene {
         if (this._actionBtn) {
             const label = this._actionBtn.querySelector('.action-label');
             const icon = this._actionBtn.querySelector('.axe-icon, .axegun-icon');
-            if (label) label.textContent = this.tool === 'plank' ? 'PLANK' : (this.tool === 'axegun' ? 'FIRE' : 'CHOP');
+            if (label) label.textContent = this.tool === 'plank' ? this.t('actionPlank') : (this.tool === 'axegun' ? this.t('actionFire') : this.t('actionChop'));
             if (icon) icon.className = this.tool === 'axegun' ? 'axegun-icon' : 'axe-icon';
-            this._actionBtn.setAttribute('aria-label', this.tool === 'axegun' ? 'Fire the axe gun' : 'Chop / interact');
+            this._actionBtn.setAttribute('aria-label', this.tool === 'axegun' ? this.t('actionAriaFire') : this.t('actionAriaChop'));
         }
     }
 
@@ -2816,7 +3538,7 @@ export default class MainScene extends Phaser.Scene {
     // view direction in DOOM). Zombies path around it — or chew through it.
     _placePlank() {
         if (this.planks <= 0) {
-            this.showToast('NO PLANKS!\nChop 3 trees to earn one', 2200);
+            this.showToast(this.t('toastNoPlanks'), 2200);
             return;
         }
         let dx = 1, dy = 0;
@@ -2830,6 +3552,7 @@ export default class MainScene extends Phaser.Scene {
         const py = Phaser.Math.Clamp(this.player.y + dy * 85, 40, 1960);
         const plank = this.plankGroup.create(px, py, 'plank').setScale(3).refreshBody();
         plank._hp = 5;             // zombie bites it can absorb
+        plank._userHp = 3;         // axe chops the player needs to break it back down
         plank.setDepth(4);
         this.planks -= 1;
         if (this._plankVal) this._plankVal.textContent = this.planks;
@@ -2875,6 +3598,49 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
+    // Player chops their own plank back down with the axe — takes 3 chops now,
+    // each one splinters + fades it a little, unlike the slow multi-bite grind
+    // zombies have to do.
+    _axeHitsPlank(axe, plank) {
+        if (!this.canChop || !plank.active) return;
+        this.canChop = false;
+        this.sounds.chop();
+        const px = plank.x, py = plank.y;
+
+        if (plank._userHp === undefined) plank._userHp = 3;
+        plank._userHp -= 1;
+
+        if (plank._userHp > 0) {
+            // Not broken yet — shake, fade a step, and spit a small chip burst.
+            this.tweens.add({
+                targets: plank,
+                x: { value: plank.x + Phaser.Math.Between(-4, 4), duration: 45, yoyo: true, repeat: 2 },
+                alpha: { value: 0.55 + (plank._userHp / 3) * 0.45, duration: 90 }
+            });
+            this._pixelBurst(px, py, {
+                colors: [0x8b5a2b, 0x6b431d, 0xa9772f],
+                count: 6, minSpeed: 60, maxSpeed: 170, gravity: 460
+            });
+            if (this.doomView && this.doomView.active) {
+                this.doomView.burstAtWorld(px, py, { colors: ['#8b5a2b', '#a9772f'], count: 6 });
+            }
+            this.time.delayedCall(300, () => { this.canChop = true; }, [], this);
+            return;
+        }
+
+        plank.destroy();
+        this._navDirty = true;
+        this.sounds.smash();
+        this._pixelBurst(px, py, {
+            colors: [0x8b5a2b, 0xa9772f, 0xc9a24a, 0x6b431d],
+            count: 18, minSpeed: 90, maxSpeed: 260, gravity: 520
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(px, py, { colors: ['#8b5a2b', '#a9772f', '#c9a24a'], count: 18 });
+        }
+        this.time.delayedCall(300, () => { this.canChop = true; }, [], this);
+    }
+
     // True if any active plank's rectangle sits on the segment between the
     // two points — used to make enemy ranged attacks (bullets, fire breath)
     // respect plank cover the same way physics collisions already do.
@@ -2897,7 +3663,7 @@ export default class MainScene extends Phaser.Scene {
         const now = this.time.now;
         if (!this._rangedWarnAt || now - this._rangedWarnAt > 2500) {
             this._rangedWarnAt = now;
-            this.showToast('RANGED LOCKED\nFULL HEALTH ONLY', 1400);
+            this.showToast(this.t('toastRangedLocked'), 1400);
         }
         return false;
     }
@@ -2943,13 +3709,20 @@ export default class MainScene extends Phaser.Scene {
     // cursor's world position. Touch has no cursor, so it falls back to the
     // player's last walking direction (matches the mobile FIRE button's
     // original "shoot the way you're facing" behavior).
-    _axeGunAimAngle() {
+    _axeGunAimAngle() { return this._aimAngle(); }
+
+    // Shared aim angle for every player attack (melee axe swing, ranged slash,
+    // axe gun): point at the mouse cursor's world position on desktop, fall
+    // back to the last walking direction on touch (no cursor there). In 3D the
+    // whole world is aimed via doomAngle, so use that.
+    _aimAngle() {
+        if (this.is3D) return this.doomAngle;
         if (!this.isTouch()) {
             const p = this.input.activePointer;
             return Math.atan2(p.worldY - this.player.y, p.worldX - this.player.x);
         }
-        const dirs = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2, none: 0 };
-        return dirs[this.lastDirection] || 0;
+        const dirs = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2 };
+        return dirs[this.facingDirection] || 0;
     }
 
     // Throws a small tumbling hatchet in the given (unit) direction. No
@@ -2970,13 +3743,13 @@ export default class MainScene extends Phaser.Scene {
     _axeGunHitsZombie(a, z) {
         if (!a.active || !z.active) return;
         this._popAxeGun(a);
-        this._damageZombie(z, 0.5);
+        this._damageZombie(z, this.AXEGUN_DAMAGE);
     }
 
-    _axeGunHitsCowboy(a, c) {
+    _axeGunHitsCowboy(c, a) {
         if (!a.active || !c.active) return;
         this._popAxeGun(a);
-        this._damageCowboy(0.5);
+        this._damageCowboy(this.AXEGUN_DAMAGE);
     }
 
     // The little axe splinters — quietly when it just runs out of range, with
@@ -3064,6 +3837,10 @@ export default class MainScene extends Phaser.Scene {
                 if (this.cowboy && this.cowboy.active
                     && Phaser.Math.Distance.Between(this.cowboy.x, this.cowboy.y, axe.x, axe.y) < 80) {
                     this._damageCowboy(2);
+                }
+                if (this.cowgirl && this.cowgirl.active
+                    && Phaser.Math.Distance.Between(this.cowgirl.x, this.cowgirl.y, axe.x, axe.y) < 80) {
+                    this._damageCowgirl(2);
                 }
                 this._pixelBurst(axe.x, axe.y, {
                     colors: rainbow, count: 12, minSpeed: 80, maxSpeed: 240, gravity: 300
@@ -3165,9 +3942,9 @@ export default class MainScene extends Phaser.Scene {
     setCowboyEnabled(on) {
         this.cowboyEnabled = on;
         document.body.classList.toggle('cowboy-on', on);
-        if (this._cowboyBtn) this._cowboyBtn.classList.toggle('on', on);
+        if (this._updateModesUI) this._updateModesUI();
         if (on) {
-            this.showToast('A COWBOY RIDES IN\nFROM THE EAST...', 2600);
+            this.showToast(this.t('toastCowboyRideIn'), 2600);
             if (!this.cowboy) this._spawnCowboy();
         } else {
             if (this._cowboyRespawn) { this._cowboyRespawn.remove(); this._cowboyRespawn = null; }
@@ -3207,8 +3984,14 @@ export default class MainScene extends Phaser.Scene {
             this.physics.add.collider(c, this.ohsSchool),
             this.physics.add.collider(c, this.brownSchool),
             this.physics.add.overlap(this.axe, c, this._axeHitsCowboy, null, this),
-            this.physics.add.overlap(this.slashGroup, c, this._slashHitsCowboy, null, this),
-            this.physics.add.overlap(this.axeGunGroup, c, this._axeGunHitsCowboy, null, this),
+            // Cowboy `c` is a single sprite, slashGroup/axeGunGroup are Groups —
+            // Phaser's arcade overlap always calls back with the single object
+            // FIRST regardless of the order passed here, so `c` must be passed
+            // first or these handlers receive (cowboy, projectile) swapped and
+            // end up destroying the cowboy sprite directly (see _slashHitsCowboy
+            // / _axeGunHitsCowboy below). Matches the player/bulletGroup pattern.
+            this.physics.add.overlap(c, this.slashGroup, this._slashHitsCowboy, null, this),
+            this.physics.add.overlap(c, this.axeGunGroup, this._axeGunHitsCowboy, null, this),
             this.physics.add.overlap(c, this.bombs, this._cowboyTripsBomb, null, this),
         ];
         this._pixelBurst(x, y, {
@@ -3368,7 +4151,7 @@ export default class MainScene extends Phaser.Scene {
         this.time.delayedCall(300, () => { this.canChop = true; }, [], this);
     }
 
-    _slashHitsCowboy(s, c) {
+    _slashHitsCowboy(c, s) {
         if (!s.active || !c.active) return;
         this._popSlash(s);
         this._damageCowboy(1);
@@ -3424,10 +4207,212 @@ export default class MainScene extends Phaser.Scene {
         this.doomView.burstAtWorld(cx, cy, { colors: ['#c9a24a', '#8b5a2b', '#ff3b3b', '#e0e0e0'], count: 30, wz: 30 });
         this.doomView.textAtWorld(cx, cy, "GOT 'EM!");
         if (this.cowboyEnabled) {
-            this.showToast('The cowboy is down...\nhe\'ll ride back in 30s', 3000);
+            this.showToast(this.t('toastCowboyDown'), 3000);
             this._cowboyRespawn = this.time.delayedCall(30000, () => {
                 this._cowboyRespawn = null;
                 if (this.cowboyEnabled) this._spawnCowboy();
+            });
+        }
+    }
+
+    // ===== The Cowgirl (on her pig) =====
+    // Opt-in via the "cowgirl?" HUD button, right next to the cowboy toggle.
+    // Unlike the cowboy's ranged standoff, she's a pure airborne contact
+    // attacker: always flying straight at the player, never stopping, and
+    // NOT bound by the world edges (setCollideWorldBounds is left off on
+    // purpose). Her turn rate is capped low, so overshooting the player
+    // means a wide swooping arc to come back around instead of snapping
+    // onto them — that's the whole "hard to rotate" feel. On contact she
+    // deals a heart of damage, knocks the player back, and lassoes them.
+
+    setCowgirlEnabled(on) {
+        this.cowgirlEnabled = on;
+        document.body.classList.toggle('cowgirl-on', on);
+        if (this._updateModesUI) this._updateModesUI();
+        if (on) {
+            this.showToast(this.t('toastCowgirlRideIn'), 2600);
+            if (!this.cowgirl) this._spawnCowgirl();
+        } else {
+            if (this._cowgirlRespawn) { this._cowgirlRespawn.remove(); this._cowgirlRespawn = null; }
+            this._despawnCowgirl();
+        }
+    }
+
+    _despawnCowgirl() {
+        if (this._cowgirlColliders) {
+            this._cowgirlColliders.forEach(c => c && c.destroy && c.destroy());
+            this._cowgirlColliders = null;
+        }
+        if (this.cowgirl) { this.cowgirl.destroy(); this.cowgirl = null; }
+    }
+
+    _spawnCowgirl() {
+        if (this.cowgirl) return;
+        // Ride in from a random bearing, well outside the player's view.
+        const ang = Math.random() * Math.PI * 2;
+        const x = this.player.x + Math.cos(ang) * 700;
+        const y = this.player.y + Math.sin(ang) * 700;
+        const g = this.physics.add.sprite(x, y, 'cowgirl', 0).setScale(0.6);
+        // No setCollideWorldBounds() — she's free to swoop outside the
+        // 2000x2000 world while she works her wide turns back around.
+        g.setDepth(5);
+        g._hp = this.COWGIRL_HP;
+        g._heading = Math.atan2(this.player.y - y, this.player.x - x);
+        g._stunUntil = 0;
+        g.anims.play('cowgirl-fly');
+        this.cowgirl = g;
+        this._cowgirlColliders = [
+            this.physics.add.overlap(this.axe, g, this._axeHitsCowgirl, null, this),
+            // Same single-object-first rule as the cowboy: `g` must come
+            // first when paired with a Group or the callback args swap and
+            // _popSlash/_popAxeGun end up destroying her sprite directly.
+            this.physics.add.overlap(g, this.slashGroup, this._slashHitsCowgirl, null, this),
+            this.physics.add.overlap(g, this.axeGunGroup, this._axeGunHitsCowgirl, null, this),
+            this.physics.add.overlap(this.player, g, this._cowgirlTouchPlayer, null, this),
+        ];
+        this._pixelBurst(x, y, {
+            colors: [0xffb6c1, 0xff69b4, 0x8b5a2b],
+            count: 18, minSpeed: 70, maxSpeed: 220, gravity: 0
+        });
+    }
+
+    // Per-frame cowgirl steering (runs in 2D and DOOM). Pure pursuit with a
+    // hard cap on turn rate — that's what produces the wide, slow arcs.
+    _updateCowgirl() {
+        const g = this.cowgirl;
+        if (!g || !g.active) return;
+        const now = this.time.now;
+        const dt = this.game.loop.delta / 1000;
+
+        // A dash-shield knockback (or Zenith axe) owns her velocity while it
+        // bleeds off — same pattern as zombies/the cowboy.
+        if (now < (g._stunUntil || 0)) {
+            g.setVelocity(g.body.velocity.x * 0.9, g.body.velocity.y * 0.9);
+            return;
+        }
+
+        const desired = Math.atan2(this.player.y - g.y, this.player.x - g.x);
+        let diff = Phaser.Math.Angle.Wrap(desired - g._heading);
+        const maxTurn = this.COWGIRL_TURN_RATE * dt;
+        diff = Phaser.Math.Clamp(diff, -maxTurn, maxTurn);
+        g._heading = Phaser.Math.Angle.Wrap(g._heading + diff);
+
+        g.setVelocity(Math.cos(g._heading) * this.COWGIRL_SPEED, Math.sin(g._heading) * this.COWGIRL_SPEED);
+        // Always look AT the player, no matter which way she's actually flying —
+        // she watches him the whole time (flip on the side he's standing on).
+        g.setFlipX(this.player.x < g.x);
+        // Subtle bank into the turn — the sprite itself stays upright
+        // (rotating a side-view rider+pig sheet 90°+ would look broken).
+        g.setAngle(Phaser.Math.Clamp(Phaser.Math.RadToDeg(diff) * -4, -15, 15));
+    }
+
+    _axeHitsCowgirl(axe, g) {
+        if (!this.canChop || !g.active) return;
+        this.canChop = false;
+        this.sounds.chop();
+        this._damageCowgirl(2);
+        this.time.delayedCall(300, () => { this.canChop = true; }, [], this);
+    }
+
+    _slashHitsCowgirl(g, s) {
+        if (!s.active || !g.active) return;
+        this._popSlash(s);
+        this._damageCowgirl(1);
+    }
+
+    _axeGunHitsCowgirl(g, a) {
+        if (!a.active || !g.active) return;
+        this._popAxeGun(a);
+        this._damageCowgirl(this.AXEGUN_DAMAGE);
+    }
+
+    // Player/single object first — see the comment on _spawnCowgirl's
+    // colliders. Contact damage, knockback, and a 3s lasso.
+    _cowgirlTouchPlayer(player, g) {
+        const now = this.time.now;
+        if (now < this._cowgirlDmgUntil || now < (g._stunUntil || 0)) return;
+        if (now < this._invincibleUntil) return; // Zenith: untouchable
+        this._cowgirlDmgUntil = now + 1800;
+        g._stunUntil = now + 900; // she peels off after landing the hit
+        g.setVelocity(0, 0);
+        this.sounds.smash();
+        this.damage(1);
+        this.cameras.main.shake(180, 0.012);
+        this._pixelBurst(player.x, player.y, {
+            colors: [0xffb6c1, 0xff69b4, 0x8b5a2b, 0xffffff],
+            count: 20, minSpeed: 90, maxSpeed: 260, gravity: 380
+        });
+        if (this.doomView && this.doomView.active) {
+            this.doomView.burstAtWorld(player.x, player.y, { colors: ['#ffb6c1', '#ff69b4', '#8b5a2b'], count: 16 });
+        }
+        const ang = Math.atan2(player.y - g.y, player.x - g.x);
+        player.setVelocity(Math.cos(ang) * 900, Math.sin(ang) * 900);
+        this._knockbackUntil = now + 500;
+        this._lassoedUntil = now + 3000;
+        this.showToast(this.t('toastLassoed'), 1600);
+    }
+
+    // Three thick, dark rope lines cinched horizontally across the middle of
+    // the player while lassoed — drawn fresh every frame so they track exactly.
+    _updateLasso() {
+        if (!this._lassoGfx) {
+            this._lassoGfx = this.add.graphics().setDepth(16001);
+            if (this.miniMap) this.miniMap.ignore(this._lassoGfx);
+        }
+        this._lassoGfx.clear();
+        if (this.time.now >= this._lassoedUntil) return;
+        const px = this.player.x, py = this.player.y;
+        const w = 30;                 // half-width of each rope line
+        const gap = 9;                // vertical spacing between the three lines
+        // Thick rope, drawn as three tight horizontal bands centred on the body.
+        for (const oy of [-gap, 0, gap]) {
+            this._lassoGfx.lineStyle(7, 0x3a2410, 1);   // dark rope core
+            this._lassoGfx.beginPath();
+            this._lassoGfx.moveTo(px - w, py + oy);
+            this._lassoGfx.lineTo(px + w, py + oy);
+            this._lassoGfx.strokePath();
+            this._lassoGfx.lineStyle(3, 0x6b431d, 1);   // lighter braid highlight
+            this._lassoGfx.beginPath();
+            this._lassoGfx.moveTo(px - w, py + oy);
+            this._lassoGfx.lineTo(px + w, py + oy);
+            this._lassoGfx.strokePath();
+        }
+    }
+
+    _damageCowgirl(dmg) {
+        const g = this.cowgirl;
+        if (!g || !g.active) return;
+        g._hp -= dmg;
+        g.setTintFill(0xffffff);
+        this.time.delayedCall(90, () => { if (g.active) g.clearTint(); });
+        this._pixelBurst(g.x, g.y, {
+            colors: [0xff3b3b, 0xffb6c1, 0x8b5a2b],
+            count: 8, minSpeed: 70, maxSpeed: 200, gravity: 0
+        });
+        if (g._hp <= 0) this._killCowgirl();
+    }
+
+    _killCowgirl() {
+        const g = this.cowgirl;
+        if (!g) return;
+        const gx = g.x, gy = g.y;
+        this._despawnCowgirl();
+        this.sounds.smash();
+        this.cowgirlKills += 1;
+        try { localStorage.setItem('cowgirlKills', this.cowgirlKills); } catch (e) {}
+        if (this._gscoreVal) this._gscoreVal.textContent = this.cowgirlKills;
+        this._pixelBurst(gx, gy, {
+            colors: [0xffb6c1, 0xff69b4, 0x8b5a2b, 0xe0e0e0, 0xff3b3b],
+            count: 30, minSpeed: 110, maxSpeed: 320, gravity: 0
+        });
+        this.showCutText(gx, gy - 40, 'YEEHAW\'D!');
+        this.doomView.burstAtWorld(gx, gy, { colors: ['#ffb6c1', '#ff69b4', '#8b5a2b', '#e0e0e0'], count: 30, wz: 30 });
+        this.doomView.textAtWorld(gx, gy, "YEEHAW'D!");
+        if (this.cowgirlEnabled) {
+            this.showToast(this.t('toastCowgirlDown'), 3000);
+            this._cowgirlRespawn = this.time.delayedCall(30000, () => {
+                this._cowgirlRespawn = null;
+                if (this.cowgirlEnabled) this._spawnCowgirl();
             });
         }
     }
@@ -3438,7 +4423,7 @@ export default class MainScene extends Phaser.Scene {
     // landmarks, or the player (so a regrowing forest can't trap anyone).
     _spawnTrees() {
         const worldWidth = 2000, worldHeight = 2000;
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 40; i++) {
             let x, y, overlap, tries = 0;
             do {
                 x = Phaser.Math.Between(0, worldWidth);
@@ -3644,7 +4629,7 @@ export default class MainScene extends Phaser.Scene {
         this.ohsGhosts = [];
         if (this.ohsExitSign) { this.ohsExitSign.destroy(); this.ohsExitSign = null; }
 
-        this.cameras.main.setBackgroundColor('#000000');
+        this.cameras.main.setBackgroundColor(this._mainBgColor());
         if (this.doomView) this.doomView.setFloorColor && this.doomView.setFloorColor(null);
         this._setMainWorldActive(true);
         this.ohsChops = 0;
@@ -3729,7 +4714,7 @@ export default class MainScene extends Phaser.Scene {
             y: { value: ghostSprite.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
             onComplete: () => {
                 ghost.chops++;
-                if (ghost.chops >= 3) {
+                if (ghost.chops >= this._entityChopsNeeded()) {
                     this.sounds.smash();
                     this.openSubPage(`https://${ghost.subdomain}.bruno-rodriguez-mendez.com`, ghost);
                 }
@@ -3780,7 +4765,7 @@ export default class MainScene extends Phaser.Scene {
             y: { value: orb.y + Phaser.Math.Between(-5, 5), duration: 50, yoyo: true, repeat: 3 },
             onComplete: () => {
                 this.orbChops++;
-                if (this.orbChops >= 3) {
+                if (this.orbChops >= this._entityChopsNeeded()) {
                     this.sounds.smash();
                     this.orbActivated = true;
                     let title = "I'm Salutatorian ^_^";

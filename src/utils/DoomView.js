@@ -75,7 +75,6 @@ export default class DoomView {
     setActive(on) {
         this.active = on;
         this.canvas.style.display = on ? 'block' : 'none';
-        this.panel.style.display = on ? 'block' : 'none';
         document.body.classList.toggle('mode-doom', on);
         if (!on) { this.fxBursts = []; this.fxTexts = []; } // drop stale FX on exit
     }
@@ -292,6 +291,21 @@ export default class DoomView {
 
         // --- Hit/break particles + floating hype words (chopping in DOOM) ---
         this._drawFx(ctx, px, py, angle, focal, horizon, W, H, dt);
+
+        // --- Let the minimap show through ---
+        // The minimap is a real Phaser camera rendered on the main game
+        // canvas underneath this overlay, not a DOM element, so CSS z-index
+        // can't lift just that corner above the raycaster. Instead, punch a
+        // transparent hole in this canvas over the minimap's screen rect each
+        // frame — whatever the minimap camera drew there shows through as-is
+        // (same live top-down feed as 2D mode, not a separate recreation).
+        const mm = this.scene.miniMap;
+        if (mm) {
+            const rs = Math.max(1, s.pixelation);
+            const hx = Math.round(mm.x / rs), hy = Math.round(mm.y / rs);
+            const hw = Math.round(mm.width / rs), hh = Math.round(mm.height / rs);
+            ctx.clearRect(hx, hy, hw, hh);
+        }
     }
 
     // Draws the currently-held weapon. The axe swings through a chop arc
@@ -345,6 +359,10 @@ export default class DoomView {
         ctx.save();
         ctx.translate(handX, handY);
         ctx.rotate(rot);
+        // Angle the axe INTO the scene — foreshortened + skewed so it reads as
+        // held out ahead pointing at the enemies, not stood up flat against the
+        // screen. (Tunable: c = lean, d = foreshorten.)
+        ctx.transform(1, 0, -0.34, 0.82, 0, 0);
         ctx.scale(-1, 1); // mirror the axe across its Y axis (3D held-weapon flip)
         ctx.drawImage(
             src, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
@@ -388,6 +406,10 @@ export default class DoomView {
 
         ctx.save();
         ctx.translate(handX, handY);
+        // Barrel angled up toward the crosshair (pointing away at the enemies),
+        // plus a foreshortening skew — reads as aimed downrange, not held flat.
+        ctx.rotate(-0.5);
+        ctx.transform(1, 0, -0.3, 0.8, 0, 0);
         ctx.scale(-1, 1); // mirror to match the axe's held-weapon flip
         ctx.drawImage(
             src, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
@@ -396,16 +418,16 @@ export default class DoomView {
         ctx.restore();
     }
 
+    // Builds the live-slider rows as a plain (unpositioned) DOM node — it's
+    // not shown anywhere on its own. The gear/settings panel embeds it
+    // directly (see MainScene._renderSettings), so there's no separate
+    // floating overlay to collide with the rest of the HUD in 3D anymore.
     _buildControls() {
         const panel = document.createElement('div');
         panel.id = 'doom-controls';
         Object.assign(panel.style, {
-            position: 'fixed', top: '12px', left: '12px', zIndex: '1600', display: 'none',
-            background: 'rgba(20,20,28,0.9)', border: '2px solid #c6ff33', padding: '10px 12px',
-            font: '11px monospace', color: '#c6ff33', maxWidth: '230px',
-            boxShadow: '4px 4px 0 #000', touchAction: 'manipulation'
+            font: '11px monospace', color: '#c6ff33', touchAction: 'manipulation'
         });
-        panel.innerHTML = '<div style="font-weight:bold;margin-bottom:6px">DOOM SETTINGS</div>';
 
         const rows = [
             ['fov', 'FOV', 40, 120, 1],
@@ -442,7 +464,6 @@ export default class DoomView {
             row.append(name, input, val);
             panel.appendChild(row);
         }
-        document.body.appendChild(panel);
         this.panel = panel;
     }
 

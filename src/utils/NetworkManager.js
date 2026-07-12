@@ -2,10 +2,12 @@
 // Reconnects with backoff, throttles outgoing position updates, and hands the
 // latest peer list to the scene via onState — it owns no Phaser objects itself.
 export default class NetworkManager {
-    constructor(url, { onState, onConnectionChange } = {}) {
+    constructor(url, { onState, onConnectionChange, onModes, onHit } = {}) {
         this.url = url;
         this.onState = onState || (() => {});
         this.onConnectionChange = onConnectionChange || (() => {});
+        this.onModes = onModes || (() => {});   // live game-mode vote tallies
+        this.onHit = onHit || (() => {});        // an incoming PvP hit on us
         this.id = null;
         this.num = null;
         this.ws = null;
@@ -40,6 +42,9 @@ export default class NetworkManager {
                 this.num = msg.num;
             } else if (msg.type === 'state' && Array.isArray(msg.players)) {
                 this.onState(msg.players.filter(p => p.id !== this.id));
+                if (msg.modes) this.onModes(msg.modes);
+            } else if (msg.type === 'hit') {
+                this.onHit(msg);
             }
         };
         this.ws.onclose = () => { this._setConnected(false); if (!this._destroyed) this._scheduleReconnect(); };
@@ -59,6 +64,21 @@ export default class NetworkManager {
         this._lastSendAt = now;
         this.ws.send(JSON.stringify({ type: 'pos', x: Math.round(x), y: Math.round(y), dir }));
     }
+
+    _send(obj) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+        this.ws.send(JSON.stringify(obj));
+        return true;
+    }
+
+    // Cast/clear this client's vote on a game mode (1 = ✓, -1 = ✗, 0 = abstain).
+    sendVote(mode, val) { return this._send({ type: 'vote', mode, val }); }
+
+    // Announce our PvP + spectator state so peers know whether we're fightable.
+    sendPvp(on, spectator) { return this._send({ type: 'pvp', on: !!on, spectator: !!spectator }); }
+
+    // Tell the server we struck another player; it forwards to that target.
+    sendHit(targetId, dmg) { return this._send({ type: 'hit', target: targetId, dmg }); }
 
     destroy() {
         this._destroyed = true;

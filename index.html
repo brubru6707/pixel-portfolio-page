@@ -342,71 +342,96 @@
             background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M1 6 L4 6 L8 2 L8 14 L4 10 L1 10 Z' fill='%23888'/><path d='M10 4 L15 12' stroke='%23ff5555' stroke-width='1.7'/><path d='M15 4 L10 12' stroke='%23ff5555' stroke-width='1.7'/></svg>");
         }
 
-        /* Exit button — clears the visitor choice + reloads. Next to the SFX btn. */
-        #exit-btn {
+        /* Bottom-left HUD row: gear (leftmost) → exit → game modes, all inside
+           one flex container so button widths (which vary by language) can
+           never overlap each other via stale hardcoded left offsets. */
+        #bottomleft-hud {
             position: fixed;
             bottom: max(24px, env(safe-area-inset-bottom));
-            left: 182px;
-            height: 44px;
+            left: 20px;
+            z-index: 1500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        body.mode-doom #bottomleft-hud { display: none; }
+
+        /* Exit button — clears the visitor choice + reloads. */
+        #exit-btn {
+            height: 34px;
             padding: 0 12px;
             font-size: 12px;
-            z-index: 1500;
         }
-        body.mode-doom #exit-btn { display: none; }
 
-        /* Zombies + cowboy toggles — continue the bottom-left row after exit */
+        /* Settings (gear icon) — theme, language, sound + how-to-play. */
+        #gear-btn {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+        }
+        .gear-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: center / contain no-repeat;
+            image-rendering: pixelated;
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><g fill='%23c6ff33'><rect x='6' y='0' width='4' height='2'/><rect x='6' y='14' width='4' height='2'/><rect x='0' y='6' width='2' height='4'/><rect x='14' y='6' width='2' height='4'/><rect x='2' y='2' width='2' height='2'/><rect x='12' y='2' width='2' height='2'/><rect x='2' y='12' width='2' height='2'/><rect x='12' y='12' width='2' height='2'/><rect x='4' y='4' width='8' height='8'/></g><g fill='%231b1b2f'><rect x='6' y='6' width='4' height='4'/></g></svg>");
+        }
+
+        /* "GAME MODES" button — continues the row after exit. Opens the
+           modes-voting menu. */
         #extra-btns {
-            position: fixed;
-            bottom: max(24px, env(safe-area-inset-bottom));
-            left: 264px;
             display: flex;
             gap: 8px;
-            z-index: 1500;
         }
-        body.mode-doom #extra-btns { display: none; }
-        #zombie-btn {
-            height: 44px;
+        #modes-btn {
+            height: 34px;
             padding: 0 12px;
             font-size: 10px;
         }
-        #zombie-btn.on {
+        /* Lit up while any mode is currently live. */
+        #modes-btn.active {
             border-color: #ff5555;
             color: #ff5555;
-        }
-        /* Small screens: the bottom row runs out of width — lift the extra
-           buttons one row up, above the ? / music / exit row. */
-        @media (max-width: 600px) {
-            #extra-btns {
-                left: 20px;
-                bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px));
-                flex-wrap: wrap;          /* zombies? + cowboy? */
-                max-width: calc(100vw - 120px);
-            }
         }
         #music-btn.off .music-icon {
             background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><rect x='1' y='6' width='2' height='4' fill='%23888'/><rect x='3' y='5' width='2' height='6' fill='%23888'/><rect x='5' y='4' width='2' height='8' fill='%23888'/><rect x='7' y='2' width='2' height='12' fill='%23888'/><rect x='10' y='4' width='2' height='2' fill='%23ff5555'/><rect x='14' y='4' width='2' height='2' fill='%23ff5555'/><rect x='12' y='6' width='2' height='2' fill='%23ff5555'/><rect x='10' y='8' width='2' height='2' fill='%23ff5555'/><rect x='14' y='8' width='2' height='2' fill='%23ff5555'/></svg>");
         }
 
         /* Top-left HUD stack — presence-server status + live FPS readout,
-           side by side so neither shifts the other around as its text changes. */
+           side by side on wide screens so neither shifts the other around as
+           its text changes. Narrow phones don't have the width to spare (it
+           runs into the hearts/minimap cluster on the right), so it switches
+           to a column — server status on top, FPS below it — instead. */
         #topleft-hud {
             position: fixed;
             top: 24px;
             left: 20px;
             z-index: 1500;
             display: flex;
-            gap: 8px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 6px;
+            max-width: calc(100vw - 40px);
             pointer-events: none;
         }
         #server-status, #fps-counter {
             font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            padding: 8px 12px;
+            font-size: 9px;
+            height: 34px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
             background: #1b1b2f;
             border: 3px solid #6a6a78;
             box-shadow: 4px 4px 0 #000;
             color: #6a6a78;
             pointer-events: none;
+        }
+        @media (max-width: 600px) {
+            #topleft-hud { flex-direction: column; align-items: flex-start; }
+            #server-status, #fps-counter { font-size: 8px; padding: 0 6px; }
         }
         #server-status.active {
             border-color: #c6ff33;
@@ -558,7 +583,7 @@
         }
 
         /* ---- Tree-cut score (persisted), sits just left of the hearts ---- */
-        #score-hud, #zscore-hud, #cscore-hud {
+        #score-hud, #zscore-hud, #cscore-hud, #gscore-hud {
             position: fixed;
             top: 24px;
             height: 34px;
@@ -621,12 +646,33 @@
             border-color: #ffb340;
             color: #ffb340;
         }
-        /* Phones: the top row can't fit 3 counter chips beside the hearts —
+
+        /* Cowgirl-kill counter — appears left of the cowboy score when she's on */
+        #gscore-hud {
+            right: 584px;
+            display: none;
+            color: #ff8fc4;
+        }
+        body.cowgirl-on #gscore-hud { display: flex; }
+        #gscore-hud .gscore-icon {
+            width: 26px;
+            height: 26px;
+            image-rendering: pixelated;
+            /* first (100x100) frame of the 6-frame cow-girl-on-pig sheet */
+            background: left center / auto 100% no-repeat url("assets/cow-girl-on-pig.png");
+        }
+        #cowgirl-btn { height: 44px; padding: 0 12px; font-size: 10px; }
+        #cowgirl-btn.on {
+            border-color: #ff8fc4;
+            color: #ff8fc4;
+        }
+        /* Phones: the top row can't fit 4 counter chips beside the hearts —
            stack them in a column under the hearts instead. */
         @media (max-width: 600px) {
             #score-hud  { right: 186px; top: 66px; }
             #zscore-hud { right: 186px; top: 108px; }
             #cscore-hud { right: 186px; top: 150px; }
+            #gscore-hud { right: 186px; top: 192px; }
         }
 
         /* Tool row: axe / axe gun / plank chips, one tap each to switch tools
@@ -688,25 +734,41 @@
         body.subpage-open #score-hud,     body.modal-open #score-hud,
         body.subpage-open #zscore-hud,    body.modal-open #zscore-hud,
         body.subpage-open #cscore-hud,    body.modal-open #cscore-hud,
+        body.subpage-open #gscore-hud,    body.modal-open #gscore-hud,
         body.subpage-open #tool-hud,      body.modal-open #tool-hud,
-        body.subpage-open #extra-btns,    body.modal-open #extra-btns,
-        body.subpage-open #exit-btn,      body.modal-open #exit-btn,
+        body.subpage-open #bottomleft-hud, body.modal-open #bottomleft-hud,
         body.subpage-open #topleft-hud,   body.modal-open #topleft-hud,
         body.subpage-open #stats-hud,     body.modal-open #stats-hud,
         body.subpage-open #sfx-btn,       body.modal-open #sfx-btn,
         body.subpage-open #music-btn,     body.modal-open #music-btn {
             display: none !important;
         }
+        /* GAME OVER takes over the screen — hide every gameplay HUD element
+           behind it so only the title + restart/exit buttons show. */
+        body.game-over-open #action-btn,
+        body.game-over-open #doom-touch,
+        body.game-over-open #hearts-hud,
+        body.game-over-open #score-hud,
+        body.game-over-open #zscore-hud,
+        body.game-over-open #cscore-hud,
+        body.game-over-open #gscore-hud,
+        body.game-over-open #tool-hud,
+        body.game-over-open #bottomleft-hud,
+        body.game-over-open #topleft-hud,
+        body.game-over-open #stats-hud,
+        body.game-over-open #mode-toggle {
+            display: none !important;
+        }
         /* Keep HUD hidden until the world scene has built it */
         body:not(.hud-ready) #action-btn,
         body:not(.hud-ready) #music-btn,
         body:not(.hud-ready) #sfx-btn,
-        body:not(.hud-ready) #exit-btn,
-        body:not(.hud-ready) #extra-btns,
+        body:not(.hud-ready) #bottomleft-hud,
         body:not(.hud-ready) #hearts-hud,
         body:not(.hud-ready) #score-hud,
         body:not(.hud-ready) #zscore-hud,
         body:not(.hud-ready) #cscore-hud,
+        body:not(.hud-ready) #gscore-hud,
         body:not(.hud-ready) #tool-hud,
         body:not(.hud-ready) #topleft-hud,
         body:not(.hud-ready) #stats-hud,
@@ -799,6 +861,291 @@
             0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
             25%  { opacity: 1; transform: translate(calc(-50% + var(--dx, 0) * 0.4), calc(-50% + var(--dy, 0) * 0.4)) scale(1.3); }
             100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0)), calc(-50% + var(--dy, 0))) scale(0.2); }
+        }
+
+        /* ---- Settings modal (gear icon): theme + language ---- */
+        #settings-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 4000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.82);
+            font-family: 'Press Start 2P', monospace;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #settings-overlay.open { display: flex; }
+        .settings-card {
+            width: 100%;
+            max-width: 420px;
+            max-height: 88vh;
+            overflow-y: auto;
+            padding: 20px 18px 22px;
+            background: #12121e;
+            border: 4px solid #c6ff33;
+            box-shadow: 8px 8px 0 #000;
+            color: #e8e8e8;
+            image-rendering: pixelated;
+        }
+        .settings-card h2 {
+            margin: 0 0 18px;
+            color: #c6ff33;
+            font-size: 15px;
+            line-height: 1.5;
+            text-align: center;
+        }
+        .settings-section { margin: 18px 0; }
+        .settings-label {
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: #7a7a8a;
+            margin-bottom: 10px;
+        }
+        .settings-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+        .settings-choice-btn {
+            flex: 1 1 auto;
+            min-width: 64px;
+            padding: 12px 8px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            color: #c6ff33;
+            background: #1b1b2f;
+            border: 2px solid #44445a;
+            box-shadow: 3px 3px 0 #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .settings-choice-btn.active {
+            border-color: #c6ff33;
+            box-shadow: 3px 3px 0 #000, 0 0 10px rgba(198, 255, 51, 0.55);
+        }
+        .settings-choice-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+        .settings-close {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            color: #12121e;
+            background: #c6ff33;
+            border: none;
+            box-shadow: 4px 4px 0 #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .settings-close:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
+        /* "HOW TO PLAY" button inside the gear panel (the old "?" chip lives here now) */
+        .settings-help {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 13px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            color: #c6ff33;
+            background: #1b1b2f;
+            border: 2px solid #c6ff33;
+            box-shadow: 4px 4px 0 #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .settings-help:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
+
+        /* ---- PvP / spectator toggle (top-left, next to the FPS readout) ---- */
+        #pvp-btn {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            line-height: 1;
+            height: 34px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            color: #7a7a8a;
+            background: rgba(20, 20, 32, 0.82);
+            border: 2px solid #44445a;
+            box-shadow: 3px 3px 0 #000;
+            padding: 0 9px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
+            pointer-events: auto;   /* parent #topleft-hud is pointer-events:none */
+        }
+        #pvp-btn.on {
+            color: #ff5a5a;
+            border-color: #ff5a5a;
+            box-shadow: 3px 3px 0 #000, 0 0 10px rgba(255, 90, 90, 0.5);
+        }
+        #pvp-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+        body.mode-doom #pvp-btn { display: none; }
+
+        /* ---- Game Modes voting menu ---- */
+        #modes-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 4000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.82);
+            font-family: 'Press Start 2P', monospace;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #modes-overlay.open { display: flex; }
+        .modes-card {
+            width: 100%;
+            max-width: 460px;
+            max-height: 88vh;
+            overflow-y: auto;
+            padding: 20px 18px 22px;
+            background: #12121e;
+            border: 4px solid #c6ff33;
+            box-shadow: 8px 8px 0 #000;
+            color: #e8e8e8;
+            image-rendering: pixelated;
+        }
+        .modes-card h2 {
+            margin: 0 0 12px;
+            color: #c6ff33;
+            font-size: 15px;
+            text-align: center;
+        }
+        .modes-note {
+            margin: 0 0 18px;
+            font-size: 8px;
+            line-height: 1.7;
+            color: #7a7a8a;
+            text-align: center;
+        }
+        .modes-list { display: flex; flex-direction: column; gap: 12px; }
+        .mode-row {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+            padding: 8px;
+            background: #1b1b2f;
+            border: 2px solid #44445a;
+            box-shadow: 3px 3px 0 #000;
+        }
+        .mode-row.on { border-color: #ff5a5a; box-shadow: 3px 3px 0 #000, 0 0 10px rgba(255, 90, 90, 0.4); }
+        .vote-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            min-width: 52px;
+            padding: 8px 6px;
+            font-family: 'Press Start 2P', monospace;
+            background: #12121e;
+            border: 2px solid #44445a;
+            box-shadow: 2px 2px 0 #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .vote-btn .vote-mark { font-size: 15px; line-height: 1; }
+        .vote-btn .vote-count { font-size: 11px; line-height: 1; color: #e8e8e8; }
+        .vote-btn.yes .vote-mark { color: #50fa7b; }
+        .vote-btn.no  .vote-mark { color: #ff5555; }
+        .vote-btn.yes.mine { border-color: #50fa7b; box-shadow: 2px 2px 0 #000, 0 0 8px rgba(80, 250, 123, 0.6); }
+        .vote-btn.no.mine  { border-color: #ff5555; box-shadow: 2px 2px 0 #000, 0 0 8px rgba(255, 85, 85, 0.6); }
+        .vote-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+        .mode-name {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #c6ff33;
+            text-align: center;
+        }
+        .mode-on-badge {
+            display: none;
+            font-size: 8px;
+            color: #12121e;
+            background: #ff5a5a;
+            padding: 3px 6px;
+            box-shadow: 2px 2px 0 #000;
+        }
+        .mode-row.on .mode-on-badge { display: inline-block; }
+        .modes-close {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            color: #12121e;
+            background: #c6ff33;
+            border: none;
+            box-shadow: 4px 4px 0 #000;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .modes-close:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
+
+        /* ---- GAME OVER overlay ---- */
+        #game-over {
+            position: fixed;
+            inset: 0;
+            z-index: 6000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 34px;
+            padding: 24px;
+            background: rgba(0, 0, 0, 0.9);
+            font-family: 'Press Start 2P', monospace;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #game-over-title {
+            font-size: clamp(28px, 9vw, 64px);
+            color: #ff3b3b;
+            text-shadow: 4px 4px 0 #000, 0 0 18px rgba(255, 59, 59, 0.7);
+            letter-spacing: 2px;
+            text-align: center;
+        }
+        #game-over-btns {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        #restart-btn, #game-over-exit {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 14px;
+            padding: 16px 20px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            color: #e8e8e8;
+            background: #12121e;
+            border: 3px solid #44445a;
+            box-shadow: 5px 5px 0 #000;
+        }
+        #game-over-exit:active, #restart-btn:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 #000; }
+        .restart-secs { color: #fff; }
+        /* Glowing rainbow pixel border that cycles hues around the restart button */
+        #restart-btn {
+            position: relative;
+            border-color: transparent;
+            background:
+                linear-gradient(#12121e, #12121e) padding-box,
+                conic-gradient(from 0deg, #ff2d55, #ff9500, #ffe500, #34d158, #00c7ff, #5e5ce6, #ff2dd4, #ff2d55) border-box;
+            animation: restart-rainbow 1.4s linear infinite, restart-glow 1.4s linear infinite;
+        }
+        @keyframes restart-rainbow { to { filter: hue-rotate(360deg); } }
+        @keyframes restart-glow {
+            0%, 100% { box-shadow: 5px 5px 0 #000, 0 0 14px rgba(255, 120, 220, 0.7); }
+            50%      { box-shadow: 5px 5px 0 #000, 0 0 24px rgba(120, 200, 255, 0.9); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #restart-btn { animation: none; }
         }
 
         /* Transient pixel toast (e.g. first-time DOOM controls hint) */
@@ -1077,6 +1424,70 @@
         @keyframes loadingSparkFly {
             0%   { opacity: 1; transform: translate(0, 0) scale(1); }
             100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.2); }
+        }
+
+        /* ---- Light theme (gear icon → THEME) ----
+           Restyles the DOM chrome (HUD buttons/panels/toasts/modals) to a
+           bright pixel look. The Phaser game world itself (sprites, tiles,
+           the raycast DOOM view) keeps its normal art — this is a UI-chrome
+           theme swap, not a re-skin of the game's pixel art. */
+        body.theme-light .pixel-hud-btn {
+            color: #2d6b1c;
+            background: #f4f7e8;
+            border-color: #2d6b1c;
+        }
+        body.theme-light #zombie-btn.on { border-color: #b23a3a; color: #b23a3a; }
+        body.theme-light #cowboy-btn.on { border-color: #a86a1a; color: #a86a1a; }
+        body.theme-light #cowgirl-btn.on { border-color: #c23a7a; color: #c23a7a; }
+        body.theme-light .music-icon,
+        body.theme-light .sfx-icon path,
+        body.theme-light .gear-icon rect { filter: hue-rotate(0deg); }
+        body.theme-light #server-status, body.theme-light #fps-counter {
+            background: #f4f7e8;
+            color: #4a4a5a;
+            border-color: #9a9aa8;
+        }
+        body.theme-light #server-status.active, body.theme-light #fps-counter.good { border-color: #2d6b1c; color: #2d6b1c; }
+        body.theme-light #server-status.inactive, body.theme-light #fps-counter.bad { border-color: #b23a3a; color: #b23a3a; }
+        body.theme-light #score-hud, body.theme-light #zscore-hud,
+        body.theme-light #cscore-hud, body.theme-light #gscore-hud {
+            background-color: rgba(255, 255, 255, 0.75);
+            border-color: rgba(0, 0, 0, 0.25);
+            color: #2d6b1c;
+            text-shadow: none;
+        }
+        body.theme-light #stats-chart-box { background: rgba(255, 255, 255, 0.75); border-color: #2d2d3a; }
+        body.theme-light #stats-peak { color: #2d2d3a; }
+        body.theme-light #stats-total { background: rgba(255, 255, 255, 0.75); color: #2d6b1c; text-shadow: none; }
+        body.theme-light #hud-toast {
+            background: rgba(244, 247, 232, 0.97);
+            color: #2d6b1c;
+            border-color: #2d6b1c;
+        }
+        body.theme-light .tutorial-card, body.theme-light .settings-card {
+            background: #f4f7e8;
+            border-color: #2d6b1c;
+            color: #2d2d3a;
+        }
+        body.theme-light .tutorial-card h2, body.theme-light .settings-card h2 { color: #2d6b1c; }
+        body.theme-light .tutorial-key {
+            background: #ffffff;
+            border-color: #2d6b1c;
+            color: #2d6b1c;
+        }
+        body.theme-light .tutorial-note, body.theme-light .settings-label { color: #6a6a78; }
+        body.theme-light .tutorial-start, body.theme-light .settings-close {
+            background: #2d6b1c;
+            color: #f4f7e8;
+        }
+        body.theme-light .settings-choice-btn {
+            background: #ffffff;
+            color: #2d6b1c;
+            border-color: #b8c8a8;
+        }
+        body.theme-light .settings-choice-btn.active {
+            border-color: #2d6b1c;
+            box-shadow: 3px 3px 0 #000, 0 0 10px rgba(45, 107, 28, 0.4);
         }
     </style>
 </head>
