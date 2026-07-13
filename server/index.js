@@ -16,6 +16,7 @@ const PORT = parseInt(process.env.PORT, 10) || 443;
 const CERT_PATH = process.env.CERT_PATH || `${__dirname}/certs/fullchain.pem`;
 const KEY_PATH = process.env.KEY_PATH || `${__dirname}/certs/privkey.pem`;
 const STATS_PATH = process.env.STATS_PATH || `${__dirname}/stats.json`;
+const SCORES_PATH = process.env.SCORES_PATH || `${__dirname}/scores.json`;
 const TICK_MS = 100;
 const MAX_PLAYERS = 60;
 const MAX_MESSAGE_BYTES = 512;
@@ -90,6 +91,76 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
     process.on(sig, () => { saveStats(); process.exit(0); });
 }
 
+// ---- Top-10 kill-count leaderboard --------------------------------------
+// Anonymous by design, same as everything else here: a client self-reports
+// its lifetime cowboy/cowgirl/zombie kill counters (already tracked
+// client-side in localStorage) and, like PvP `dmg`/`kb`, the numbers are
+// never independently verified — there's no server-side kill tracking to
+// check them against. Low stakes (a portfolio game's top-10 list), so a
+// clamp + a per-IP cooldown is enough; this is not an anti-cheat system.
+const MAX_LEADERBOARD = 10;
+const MAX_KILLS = 999999; // a legit lifetime tally won't get anywhere near this
+const SCORE_POST_COOLDOWN_MS = 5000;
+let leaderboard = []; // [{name, cowboy, cowgirl, zombie, total, ts}], sorted desc by total
+const lastScorePostByIp = new Map(); // ipHash -> last POST time, flood guard
+
+function loadLeaderboard() {
+    try {
+        const raw = JSON.parse(fs.readFileSync(SCORES_PATH, 'utf8'));
+        if (Array.isArray(raw)) leaderboard = raw.slice(0, MAX_LEADERBOARD);
+    } catch (e) { /* no file yet, or corrupt — start fresh */ }
+}
+
+function saveLeaderboard() {
+    try { fs.writeFileSync(SCORES_PATH, JSON.stringify(leaderboard)); } catch (e) {}
+}
+
+loadLeaderboard();
+
+function clampKills(n) {
+    n = Math.round(Number(n));
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.min(n, MAX_KILLS);
+}
+
+// Classic arcade three-letter initials — uppercase A-Z/0-9 only.
+function sanitizeName(raw) {
+    return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+}
+
+// Inserts/updates `name`'s entry if it earns a top-10 spot (by total kills);
+// one entry per name, keeping that name's best-ever run. Returns the
+// (possibly unchanged) leaderboard.
+function tryAddScore(name, cowboy, cowgirl, zombie) {
+    const total = cowboy + cowgirl + zombie;
+    if (total <= 0) return leaderboard;
+    if (leaderboard.length >= MAX_LEADERBOARD && total <= leaderboard[leaderboard.length - 1].total) return leaderboard;
+    const existingIdx = leaderboard.findIndex(e => e.name === name);
+    if (existingIdx !== -1) {
+        if (total <= leaderboard[existingIdx].total) return leaderboard;
+        leaderboard.splice(existingIdx, 1);
+    }
+    leaderboard.push({ name, cowboy, cowgirl, zombie, total, ts: Date.now() });
+    leaderboard.sort((a, b) => b.total - a.total);
+    leaderboard = leaderboard.slice(0, MAX_LEADERBOARD);
+    saveLeaderboard();
+    return leaderboard;
+}
+
+// Small helper since the raw https server has no body-parsing middleware.
+function readBody(req, maxBytes, cb) {
+    let data = '';
+    let size = 0;
+    let aborted = false;
+    req.on('data', (chunk) => {
+        size += chunk.length;
+        if (size > maxBytes) { aborted = true; req.destroy(); return; }
+        data += chunk;
+    });
+    req.on('end', () => { if (!aborted) cb(data); });
+    req.on('error', () => {});
+}
+
 const server = https.createServer({
     cert: fs.readFileSync(CERT_PATH),
     key: fs.readFileSync(KEY_PATH),
@@ -106,6 +177,59 @@ const server = https.createServer({
         res.end(JSON.stringify(getStats()));
         return;
     }
+
+    // The game is served from a different origin (GitHub Pages) than this
+    // box, so a POST with a JSON body triggers a real CORS preflight.
+    if (req.method === 'OPTIONS' && (req.url === '/leaderboard' || req.url === '/score')) {
+        res.writeHead(204, {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '86400',
+        });
+        res.end();
+        return;
+    }
+
+    if (req.method === 'GET' && req.url === '/leaderboard') {
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-store',
+        });
+        res.end(JSON.stringify(leaderboard));
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/score') {
+        const ipHash = hashIp(req.headers['cf-connecting-ip'] || req.socket.remoteAddress || 'unknown');
+        const now = Date.now();
+        if (now - (lastScorePostByIp.get(ipHash) || 0) < SCORE_POST_COOLDOWN_MS) {
+            res.writeHead(429, { 'Access-Control-Allow-Origin': '*' });
+            res.end();
+            return;
+        }
+        readBody(req, 1024, (body) => {
+            let msg;
+            try { msg = JSON.parse(body); } catch (e) { msg = null; }
+            const name = msg && sanitizeName(msg.name);
+            if (!name) {
+                res.writeHead(400, { 'Access-Control-Allow-Origin': '*' });
+                res.end();
+                return;
+            }
+            lastScorePostByIp.set(ipHash, now);
+            const updated = tryAddScore(name, clampKills(msg.cowboy), clampKills(msg.cowgirl), clampKills(msg.zombie));
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'no-store',
+            });
+            res.end(JSON.stringify(updated));
+        });
+        return;
+    }
+
     // WebSocketServer only wires up the 'upgrade' event; without a 'request'
     // handler, plain HTTP hits (health checks, stray browsers) hang forever
     // instead of getting a response.

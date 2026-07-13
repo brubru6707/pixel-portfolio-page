@@ -3,7 +3,7 @@ import GhostEntity from '../entities/GhostEntity.js';
 import SoundManager from '../utils/SoundManager.js';
 import DoomView from '../utils/DoomView.js';
 import NetworkManager from '../utils/NetworkManager.js';
-import { WS_URL, STATS_URL } from '../config/network.js';
+import { WS_URL, STATS_URL, LEADERBOARD_URL, SCORE_URL } from '../config/network.js';
 
 // Tints applied to remote players' sprites (cycled by player number) so
 // multiple ghosts on screen stay visually distinct from each other and from
@@ -30,7 +30,7 @@ const I18N = {
         cowboyLabel: 'cowboy', cowboyAria: 'Toggle the cowboy duel',
         cowgirlLabel: 'cowgirl', cowgirlAria: 'Toggle the cowgirl on her pig',
         gameModesLabel: 'game modes', gameModesAria: 'Open the game modes menu',
-        modesTitle: 'GAME MODES', modesNote: 'Active players vote — majority ✓ turns a mode on for everyone',
+        modesTitle: 'GAME MODES', modesNote: 'Active players vote — majority {check} turns a mode on for everyone',
         voteYesAria: 'Vote to enable', voteNoAria: 'Vote to disable', modeOn: 'ON',
         pvpAria: 'Toggle PvP / spectator', pvpSpectate: 'spectate', pvpFight: '⚔ PvP',
         toastPvpOn: 'PvP ON\nYou can hit — and be hit by — other fighters',
@@ -38,6 +38,12 @@ const I18N = {
         soundLabel: 'SOUND', sfxOn: 'SFX ON', sfxOff: 'SFX OFF', helpLabel: 'HOW TO PLAY',
         doomPanelLabel: '3D SETTINGS',
         gameOverLabel: 'GAME OVER', restartLabel: 'RESTART?', restartAria: 'Restart in the 2D world', exitGameAria: 'Exit to the visitor screen',
+        lbTitle: 'LEADERBOARD', lbEmpty: 'no scores yet—be the first!',
+        finalScoreLabel: 'FINAL SCORE',
+        shareLabel: 'SHARE', shareAria: 'Share your score', shareCopiedLabel: 'COPIED!',
+        shareText: 'I killed {total} enemies in Chompixel — {cowboy} cowboys, {cowgirl} cowgirls, {zombie} zombies. Beat my score:',
+        newHighScoreLabel: 'NEW HIGH SCORE!', enterInitialsLabel: 'ENTER YOUR INITIALS',
+        submitScoreLabel: 'SUBMIT', submitScoreAria: 'Submit your score to the leaderboard',
         axeToolAria: 'Switch to the axe (1)', axeGunToolAria: 'Switch to the axe gun (2)', plankToolAria: 'Switch to planks (3)',
         actionChop: 'CHOP', actionFire: 'FIRE', actionPlank: 'PLANK',
         actionAriaChop: 'Chop / interact', actionAriaFire: 'Fire the axe gun',
@@ -51,10 +57,10 @@ const I18N = {
         tutChopDesktop: 'Stand next to something and hold <b>F</b> (or the {axe} button) to chop. It glows when you’re in range.',
         tutDoomTouch: 'Tap <b>3D</b> for the 3D view. Use the <b>&#9650;&#9660;&#9668;&#9658;</b> pad to turn &amp; walk, then hold CHOP.',
         tutDoomDesktop: 'Tap <b>3D</b> for the 3D DOOM view. Turn/walk with the arrow keys, chop with <b>F</b>.',
-        tutEscTouch: 'Chopping a target opens its page. Tap the <b>ESC</b> button (bottom-right) to come back.',
-        tutEscDesktop: 'Chopping a target opens its page. Press <b>ESC</b> (or the bottom-right button) to come back.',
+        tutEscTouch: 'Chopping a target opens its page. Tap the <b>ESC</b> button (top-right) to come back.',
+        tutEscDesktop: 'Chopping a target opens its page. Press <b>ESC</b> (or the top-right button) to come back.',
         tutStart: "LET'S GO",
-        tutNote: 'Chop the trees, ghosts, computer &amp; orb to explore my projects. Reopen this anytime from the <b>⚙</b> settings.',
+        tutNote: 'Chop the trees, ghosts, computer &amp; orb to explore my projects. Reopen this anytime from the <b>{gear}</b> settings.',
         toastCowboyRideIn: 'A COWBOY RIDES IN\nFROM THE EAST...',
         toastCowboyDown: "The cowboy is down...\nhe'll ride back in 30s",
         toastCowgirlRideIn: "SHE'S RIDING IN ON HER PIG...\nWATCH FOR THE LASSO",
@@ -74,7 +80,7 @@ const I18N = {
         cowboyLabel: 'vaquero', cowboyAria: 'Activar el duelo con el vaquero',
         cowgirlLabel: 'vaquera', cowgirlAria: 'Activar a la vaquera en su cerdo',
         gameModesLabel: 'modos', gameModesAria: 'Abrir el menú de modos de juego',
-        modesTitle: 'MODOS DE JUEGO', modesNote: 'Los jugadores activos votan — la mayoría ✓ activa un modo para todos',
+        modesTitle: 'MODOS DE JUEGO', modesNote: 'Los jugadores activos votan — la mayoría {check} activa un modo para todos',
         voteYesAria: 'Votar para activar', voteNoAria: 'Votar para desactivar', modeOn: 'ON',
         pvpAria: 'Alternar JcJ / espectador', pvpSpectate: 'mirar', pvpFight: '⚔ JcJ',
         toastPvpOn: '¡JcJ ACTIVADO!\nPuedes golpear — y ser golpeado por — otros luchadores',
@@ -82,6 +88,12 @@ const I18N = {
         soundLabel: 'SONIDO', sfxOn: 'EFECTOS ON', sfxOff: 'EFECTOS OFF', helpLabel: 'CÓMO JUGAR',
         doomPanelLabel: 'AJUSTES 3D',
         gameOverLabel: 'FIN DEL JUEGO', restartLabel: '¿REINICIAR?', restartAria: 'Reiniciar en el mundo 2D', exitGameAria: 'Salir a la pantalla de visitante',
+        lbTitle: 'TABLA DE POSICIONES', lbEmpty: 'aún no hay puntuaciones—¡sé el primero!',
+        finalScoreLabel: 'PUNTUACIÓN FINAL',
+        shareLabel: 'COMPARTIR', shareAria: 'Comparte tu puntuación', shareCopiedLabel: '¡COPIADO!',
+        shareText: 'Maté a {total} enemigos en Chompixel — {cowboy} vaqueros, {cowgirl} vaqueras, {zombie} zombis. Supera mi puntuación:',
+        newHighScoreLabel: '¡RÉCORD NUEVO!', enterInitialsLabel: 'INGRESA TUS INICIALES',
+        submitScoreLabel: 'ENVIAR', submitScoreAria: 'Enviar tu puntuación a la tabla de posiciones',
         axeToolAria: 'Cambiar al hacha (1)', axeGunToolAria: 'Cambiar al hacha lanzadora (2)', plankToolAria: 'Cambiar a tablones (3)',
         actionChop: 'CORTAR', actionFire: 'DISPARAR', actionPlank: 'TABLÓN',
         actionAriaChop: 'Cortar / interactuar', actionAriaFire: 'Disparar el hacha lanzadora',
@@ -95,10 +107,10 @@ const I18N = {
         tutChopDesktop: 'Colócate junto a algo y mantén pulsada <b>F</b> (o el botón {axe}) para cortar. Brilla cuando estás en rango.',
         tutDoomTouch: 'Toca <b>3D</b> para la vista en 3D. Usa el panel <b>&#9650;&#9660;&#9668;&#9658;</b> para girar y caminar, luego mantén CORTAR.',
         tutDoomDesktop: 'Pulsa <b>3D</b> para la vista DOOM en 3D. Gira/camina con las flechas, corta con <b>F</b>.',
-        tutEscTouch: 'Cortar un objetivo abre su página. Toca el botón <b>ESC</b> (abajo a la derecha) para volver.',
-        tutEscDesktop: 'Cortar un objetivo abre su página. Pulsa <b>ESC</b> (o el botón de abajo a la derecha) para volver.',
+        tutEscTouch: 'Cortar un objetivo abre su página. Toca el botón <b>ESC</b> (arriba a la derecha) para volver.',
+        tutEscDesktop: 'Cortar un objetivo abre su página. Pulsa <b>ESC</b> (o el botón de arriba a la derecha) para volver.',
         tutStart: '¡VAMOS!',
-        tutNote: 'Corta los árboles, fantasmas, la computadora y el orbe para explorar mis proyectos. Reabre esto cuando quieras desde <b>⚙</b> ajustes.',
+        tutNote: 'Corta los árboles, fantasmas, la computadora y el orbe para explorar mis proyectos. Reabre esto cuando quieras desde <b>{gear}</b> ajustes.',
         toastCowboyRideIn: 'UN VAQUERO LLEGA\nDESDE EL ESTE...',
         toastCowboyDown: 'El vaquero ha caído...\nvolverá en 30s',
         toastCowgirlRideIn: '¡ELLA LLEGA EN SU CERDO...!\nCUIDADO CON EL LAZO',
@@ -118,7 +130,7 @@ const I18N = {
         cowboyLabel: '牛仔', cowboyAria: '切换牛仔对决',
         cowgirlLabel: '女牛仔', cowgirlAria: '切换骑猪女牛仔',
         gameModesLabel: '游戏模式', gameModesAria: '打开游戏模式菜单',
-        modesTitle: '游戏模式', modesNote: '在线玩家投票——多数 ✓ 会为所有人开启该模式',
+        modesTitle: '游戏模式', modesNote: '在线玩家投票——多数 {check} 会为所有人开启该模式',
         voteYesAria: '投票开启', voteNoAria: '投票关闭', modeOn: '开',
         pvpAria: '切换 PvP / 观战', pvpSpectate: '观战', pvpFight: '⚔ PvP',
         toastPvpOn: 'PvP 已开启\n你可以攻击其他战斗玩家，也会被攻击',
@@ -126,6 +138,12 @@ const I18N = {
         soundLabel: '声音', sfxOn: '音效开', sfxOff: '音效关', helpLabel: '玩法说明',
         doomPanelLabel: '3D 设置',
         gameOverLabel: '游戏结束', restartLabel: '重新开始？', restartAria: '在2D世界重新开始', exitGameAria: '退出到访客界面',
+        lbTitle: '排行榜', lbEmpty: '暂无记录——快来抢第一！',
+        finalScoreLabel: '最终得分',
+        shareLabel: '分享', shareAria: '分享你的分数', shareCopiedLabel: '已复制！',
+        shareText: '我在Chompixel中击杀了{total}个敌人——{cowboy}个牛仔、{cowgirl}个女牛仔、{zombie}个僵尸。来超越我的分数吧：',
+        newHighScoreLabel: '创造新纪录！', enterInitialsLabel: '输入你的名字缩写',
+        submitScoreLabel: '提交', submitScoreAria: '将你的分数提交到排行榜',
         axeToolAria: '切换到斧头 (1)', axeGunToolAria: '切换到斧头枪 (2)', plankToolAria: '切换到木板 (3)',
         actionChop: '砍伐', actionFire: '开火', actionPlank: '木板',
         actionAriaChop: '砍伐/互动', actionAriaFire: '发射斧头枪',
@@ -139,10 +157,10 @@ const I18N = {
         tutChopDesktop: '站在物体旁，按住 <b>F</b>（或 {axe} 按钮）进行砍伐。在范围内时按钮会发光。',
         tutDoomTouch: '点击 <b>3D</b> 进入3D视角。使用 <b>&#9650;&#9660;&#9668;&#9658;</b> 方向键转向和行走，然后按住砍伐键。',
         tutDoomDesktop: '点击 <b>3D</b> 进入3D DOOM视角。用方向键转向/行走，按 <b>F</b> 砍伐。',
-        tutEscTouch: '砍伐目标会打开它的页面。点击右下角的 <b>ESC</b> 按钮返回。',
-        tutEscDesktop: '砍伐目标会打开它的页面。按 <b>ESC</b>（或右下角按钮）返回。',
+        tutEscTouch: '砍伐目标会打开它的页面。点击右上角的 <b>ESC</b> 按钮返回。',
+        tutEscDesktop: '砍伐目标会打开它的页面。按 <b>ESC</b>（或右上角按钮）返回。',
         tutStart: '开始！',
-        tutNote: '砍伐树木、幽灵、电脑和宝珠来探索我的项目。随时可通过 <b>⚙</b> 设置重新打开本说明。',
+        tutNote: '砍伐树木、幽灵、电脑和宝珠来探索我的项目。随时可通过 <b>{gear}</b> 设置重新打开本说明。',
         toastCowboyRideIn: '一个牛仔从东边\n骑马而来...',
         toastCowboyDown: '牛仔倒下了……\n30秒后会回来',
         toastCowgirlRideIn: '她骑着猪冲过来了……\n小心她的套索',
@@ -162,7 +180,7 @@ const I18N = {
         cowboyLabel: 'cowboy', cowboyAria: 'Activer le duel avec le cowboy',
         cowgirlLabel: 'cowgirl', cowgirlAria: 'Activer la cowgirl sur son cochon',
         gameModesLabel: 'modes', gameModesAria: 'Ouvrir le menu des modes de jeu',
-        modesTitle: 'MODES DE JEU', modesNote: 'Les joueurs actifs votent — la majorité ✓ active un mode pour tous',
+        modesTitle: 'MODES DE JEU', modesNote: 'Les joueurs actifs votent — la majorité {check} active un mode pour tous',
         voteYesAria: 'Voter pour activer', voteNoAria: 'Voter pour désactiver', modeOn: 'ON',
         pvpAria: 'Basculer JcJ / spectateur', pvpSpectate: 'observer', pvpFight: '⚔ JcJ',
         toastPvpOn: 'JcJ ACTIVÉ\nVous pouvez frapper — et être frappé par — d\'autres combattants',
@@ -170,6 +188,12 @@ const I18N = {
         soundLabel: 'SON', sfxOn: 'EFFETS ON', sfxOff: 'EFFETS OFF', helpLabel: 'COMMENT JOUER',
         doomPanelLabel: 'RÉGLAGES 3D',
         gameOverLabel: 'PARTIE TERMINÉE', restartLabel: 'RECOMMENCER ?', restartAria: 'Recommencer dans le monde 2D', exitGameAria: 'Quitter vers l\'écran visiteur',
+        lbTitle: 'CLASSEMENT', lbEmpty: 'aucun score pour l\'instant—soyez le premier !',
+        finalScoreLabel: 'SCORE FINAL',
+        shareLabel: 'PARTAGER', shareAria: 'Partagez votre score', shareCopiedLabel: 'COPIÉ !',
+        shareText: 'J\'ai tué {total} ennemis dans Chompixel — {cowboy} cowboys, {cowgirl} cowgirls, {zombie} zombies. Battez mon score :',
+        newHighScoreLabel: 'NOUVEAU RECORD !', enterInitialsLabel: 'ENTREZ VOS INITIALES',
+        submitScoreLabel: 'ENVOYER', submitScoreAria: 'Envoyer votre score au classement',
         axeToolAria: 'Passer à la hache (1)', axeGunToolAria: 'Passer au lance-hache (2)', plankToolAria: 'Passer aux planches (3)',
         actionChop: 'COUPER', actionFire: 'TIRER', actionPlank: 'PLANCHE',
         actionAriaChop: 'Couper / interagir', actionAriaFire: 'Tirer avec le lance-hache',
@@ -183,10 +207,10 @@ const I18N = {
         tutChopDesktop: "Placez-vous près d'un objet et maintenez <b>F</b> (ou le bouton {axe}) pour couper. Il s'illumine quand vous êtes à portée.",
         tutDoomTouch: 'Touchez <b>3D</b> pour la vue 3D. Utilisez le pavé <b>&#9650;&#9660;&#9668;&#9658;</b> pour tourner et marcher, puis maintenez COUPER.',
         tutDoomDesktop: 'Appuyez sur <b>3D</b> pour la vue DOOM en 3D. Tournez/marchez avec les flèches, coupez avec <b>F</b>.',
-        tutEscTouch: 'Couper une cible ouvre sa page. Touchez le bouton <b>ESC</b> (en bas à droite) pour revenir.',
-        tutEscDesktop: 'Couper une cible ouvre sa page. Appuyez sur <b>ESC</b> (ou le bouton en bas à droite) pour revenir.',
+        tutEscTouch: 'Couper une cible ouvre sa page. Touchez le bouton <b>ESC</b> (en haut à droite) pour revenir.',
+        tutEscDesktop: 'Couper une cible ouvre sa page. Appuyez sur <b>ESC</b> (ou le bouton en haut à droite) pour revenir.',
         tutStart: "C'EST PARTI",
-        tutNote: "Coupez les arbres, fantômes, l'ordinateur et l'orbe pour explorer mes projets. Rouvrez ceci à tout moment depuis les réglages <b>⚙</b>.",
+        tutNote: "Coupez les arbres, fantômes, l'ordinateur et l'orbe pour explorer mes projets. Rouvrez ceci à tout moment depuis les réglages <b>{gear}</b>.",
         toastCowboyRideIn: "UN COWBOY ARRIVE\nDE L'EST...",
         toastCowboyDown: 'Le cowboy est à terre...\nil reviendra dans 30s',
         toastCowgirlRideIn: 'ELLE ARRIVE SUR SON COCHON...\nATTENTION AU LASSO',
@@ -483,8 +507,13 @@ export default class MainScene extends Phaser.Scene {
         this._modesSynced = false;    // true once a vote-aware server confirms a tally
 
         // Add objects in the center of the world
-        this.computer = this.physics.add.staticSprite(worldWidth / 2, worldHeight / 2, 'computer', 0).setScale(15).refreshBody();
-        this.orb = this.physics.add.staticSprite(worldWidth / 1.2, worldHeight / 3.5, 'orb', 0).setScale(4).refreshBody();
+        this.computer = this.physics.add.staticSprite(worldWidth / 2, worldHeight / 2, 'computer', 0).setScale(11).refreshBody();
+        // The orb now lives inside the OHS sub-world (bottom-left corner), not
+        // the main world — created once here (texture/anim/colliders stay
+        // wired up the same way) but hidden + disabled until _enterSubWorld('ohs')
+        // shows it; see that function and exitOhsWorld() for the toggle.
+        this.orb = this.physics.add.staticSprite(260, worldHeight - 260, 'orb', 0).setScale(4).setVisible(false).refreshBody();
+        this.orb.body.enable = false;
         // A little below the computer's middle, offset to the right — chop it
         // once to jump to the contributing guide.
         this.contributeSign = this.physics.add.staticImage(worldWidth / 2 + 200, worldHeight / 2 + 550, 'contribute-sign').setScale(4).refreshBody();
@@ -642,17 +671,17 @@ export default class MainScene extends Phaser.Scene {
         // Personal-site preview: a static image on the computer screen (replaces
         // the old live iframe; billboards in 3D too). Chop the computer 3x to open.
         // Sit the preview higher and larger so it covers the computer's screen face
-        // (the computer is setScale(15) → ~450×390 on screen).
-        this.computerPreview = this.add.image(this.computer.x, this.computer.y - 120, 'personal-website')
-            .setScale(0.1).setDepth(6);
+        // (the computer is setScale(11) → ~330×286 on screen).
+        this.computerPreview = this.add.image(this.computer.x, this.computer.y - 88, 'personal-website')
+            .setScale(0.073).setDepth(6);
         this.miniMap.ignore(this.computerPreview);
 
         // The OHS high school in the bottom-left. Chop it 3x to enter the OHS world.
-        this.ohsSchool = this.physics.add.staticSprite(340, worldHeight - 320, 'ohs-school').setScale(6).refreshBody();
+        this.ohsSchool = this.physics.add.staticSprite(340, worldHeight - 320, 'ohs-school').setScale(5).refreshBody();
 
         // Brown University in the top-left — hand-drawn, chopping it just gets
         // you a "still coding this" message for now.
-        this.brownSchool = this.physics.add.staticSprite(360, 280, 'brown-university').setScale(5).refreshBody();
+        this.brownSchool = this.physics.add.staticSprite(360, 280, 'brown-university').setScale(4.2).refreshBody();
 
         // Spawn trees without overlap (extracted so the forest can regrow when
         // the player has chopped every last one).
@@ -1010,6 +1039,18 @@ export default class MainScene extends Phaser.Scene {
         modesBtn.addEventListener('click', () => this.showGameModes());
         extra.appendChild(modesBtn);
         this._modesBtn = modesBtn;
+
+        // First-time discovery hint: bouncing arrows over the button, gone for
+        // good (this browser) the first time the menu is actually opened.
+        let modesHintSeen = false;
+        try { modesHintSeen = !!localStorage.getItem('modesHintSeen'); } catch (e) {}
+        if (!modesHintSeen) {
+            const modesHint = document.createElement('div');
+            modesHint.id = 'modes-hint';
+            modesHint.innerHTML = '<span>&#9660;</span><span>&#9660;</span><span>&#9660;</span>';
+            extra.appendChild(modesHint);
+            this._modesHintEl = modesHint;
+        }
         // Row-toggle refs the old code updated now point at the menu rows; the
         // Game Modes menu builds + wires them (see _buildGameModes).
         this._zombieBtn = null;
@@ -1054,6 +1095,9 @@ export default class MainScene extends Phaser.Scene {
         // --- Rolling 24h unique-visitor chart, top-right under the hearts,
         // left of the minimap. Polls server/index.js's GET /stats. ---
         this._buildStatsHud();
+
+        // --- Top-10 kill-count leaderboard, right under the minimap. ---
+        this._buildLeaderboardHud();
 
         // --- Player hearts (top-right, just left of the minimap camera) ---
         // Health now runs in HALF-heart steps (cowboy bullets cost 0.5, the
@@ -1213,6 +1257,7 @@ export default class MainScene extends Phaser.Scene {
         const wasOpen = overlay.classList.contains('open');
         const touch = this.isTouch();
         const axe = '<span class="axe-icon"></span>';
+        const gear = '<span class="gear-icon tutorial-note-icon"></span>';
         const moveKey = touch ? 'TAP' : 'WASD';
         const moveText = touch ? this.t('tutMoveTouch') : this.t('tutMoveDesktop');
         const chopText = (touch ? this.t('tutChopTouch') : this.t('tutChopDesktop')).replace('{axe}', axe);
@@ -1227,7 +1272,7 @@ export default class MainScene extends Phaser.Scene {
                 <div class="tutorial-row"><span class="tutorial-key">3D</span><span>${doomText}</span></div>
                 <div class="tutorial-row"><span class="tutorial-key">ESC</span><span>${escText}</span></div>
                 <button class="tutorial-start">${this.t('tutStart')}</button>
-                <div class="tutorial-note">${this.t('tutNote')}</div>
+                <div class="tutorial-note">${this.t('tutNote').replace('{gear}', gear)}</div>
             </div>`;
         overlay.querySelector('.tutorial-start').addEventListener('click', () => this.hideTutorial());
         overlay.classList.toggle('open', wasOpen);
@@ -1352,7 +1397,7 @@ export default class MainScene extends Phaser.Scene {
         card.appendChild(h2);
         const note = document.createElement('p');
         note.className = 'modes-note';
-        note.textContent = this.t('modesNote');
+        note.innerHTML = this.t('modesNote').replace('{check}', '<span class="modes-note-check">✓</span>');
         card.appendChild(note);
 
         const list = document.createElement('div');
@@ -1417,7 +1462,15 @@ export default class MainScene extends Phaser.Scene {
         if (this.pvpEnabled) this._network.sendPvp(true, false);
     }
 
-    showGameModes() { if (this._modesOverlay) this._modesOverlay.classList.add('open'); }
+    showGameModes() {
+        if (this._modesOverlay) this._modesOverlay.classList.add('open');
+        // They found the button — the discovery hint has done its job.
+        if (this._modesHintEl) {
+            this._modesHintEl.remove();
+            this._modesHintEl = null;
+            try { localStorage.setItem('modesHintSeen', '1'); } catch (e) {}
+        }
+    }
     hideGameModes() { if (this._modesOverlay) this._modesOverlay.classList.remove('open'); }
 
     // Cast (or, if repeated, clear) our ✓/✗ vote on one mode. We always tell the
@@ -1566,7 +1619,7 @@ export default class MainScene extends Phaser.Scene {
             const titleEl = this._modesOverlay.querySelector('.modes-title');
             if (titleEl) titleEl.textContent = this.t('modesTitle');
             const noteEl = this._modesOverlay.querySelector('.modes-note');
-            if (noteEl) noteEl.textContent = this.t('modesNote');
+            if (noteEl) noteEl.innerHTML = this.t('modesNote').replace('{check}', '<span class="modes-note-check">✓</span>');
             const closeEl = this._modesOverlay.querySelector('.modes-close');
             if (closeEl) closeEl.textContent = this.t('settingsClose');
             const labelKey = { zombies: 'zombiesLabel', cowboy: 'cowboyLabel', cowgirl: 'cowgirlLabel' };
@@ -1726,24 +1779,122 @@ export default class MainScene extends Phaser.Scene {
         title.textContent = this.t('gameOverLabel');
         overlay.appendChild(title);
 
+        // Final score + share — the "beat this" hook, shown every death
+        // regardless of whether this run cracked the top 10.
+        const cowboy = this.cowboyKills || 0;
+        const cowgirl = this.cowgirlKills || 0;
+        const zombie = this.zombieKills || 0;
+        const total = cowboy + cowgirl + zombie;
+
+        const summary = document.createElement('div');
+        summary.id = 'go-summary';
+
+        const scorePanel = document.createElement('div');
+        scorePanel.id = 'go-score-panel';
+        scorePanel.innerHTML = `
+            <div id="go-score-label">${this.t('finalScoreLabel')}: ${total}</div>
+            <div id="go-score-breakdown">
+                <span class="lb-icon lb-icon-cowboy"></span><span class="lb-num lb-num-cowboy">${cowboy}</span>
+                <span class="lb-icon lb-icon-cowgirl"></span><span class="lb-num lb-num-cowgirl">${cowgirl}</span>
+                <span class="lb-icon lb-icon-zombie"></span><span class="lb-num lb-num-zombie">${zombie}</span>
+            </div>`;
+        summary.appendChild(scorePanel);
+
+        const share = document.createElement('button');
+        share.id = 'go-share-btn';
+        share.textContent = this.t('shareLabel');
+        share.setAttribute('aria-label', this.t('shareAria'));
+        share.addEventListener('click', () => {
+            const text = this._buildShareText(total, cowboy, cowgirl, zombie);
+            const url = window.location.origin + window.location.pathname;
+            if (navigator.share) {
+                navigator.share({ title: 'Chompixel', text, url }).catch(() => {});
+                return;
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(`${text} ${url}`).then(() => {
+                    share.textContent = this.t('shareCopiedLabel');
+                    setTimeout(() => { share.textContent = this.t('shareLabel'); }, 2000);
+                }).catch(() => {});
+            }
+        });
+        summary.appendChild(share);
+        overlay.appendChild(summary);
+
+        // New-high-score initials entry — only when this run's total would
+        // actually crack the cached top 10 (fewer than 10 entries yet, or it
+        // beats the current 10th place).
+        const cache = this._leaderboardCache || [];
+        const qualifies = total > 0 && (cache.length < 10 || total > cache[cache.length - 1].total);
+        if (qualifies) {
+            const hsRow = document.createElement('div');
+            hsRow.id = 'go-highscore-row';
+
+            const label = document.createElement('div');
+            label.id = 'go-highscore-label';
+            label.textContent = this.t('newHighScoreLabel');
+            hsRow.appendChild(label);
+
+            const sub = document.createElement('div');
+            sub.id = 'go-highscore-sub';
+            sub.textContent = this.t('enterInitialsLabel');
+            hsRow.appendChild(sub);
+
+            const form = document.createElement('div');
+            form.id = 'go-highscore-form';
+
+            const input = document.createElement('input');
+            input.id = 'go-initials-input';
+            input.maxLength = 3;
+            input.autocomplete = 'off';
+            input.spellcheck = false;
+            try { input.value = (localStorage.getItem('lbName') || '').slice(0, 3); } catch (e) {}
+            input.addEventListener('input', () => {
+                input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+            });
+
+            const submit = document.createElement('button');
+            submit.id = 'go-submit-btn';
+            submit.textContent = this.t('submitScoreLabel');
+            submit.setAttribute('aria-label', this.t('submitScoreAria'));
+            submit.addEventListener('click', () => {
+                const name = input.value.trim();
+                if (!name) return;
+                try { localStorage.setItem('lbName', name); } catch (e) {}
+                submit.disabled = true;
+                this._submitScore(name, cowboy, cowgirl, zombie).then(() => { hsRow.remove(); });
+            });
+
+            form.appendChild(input);
+            form.appendChild(submit);
+            hsRow.appendChild(form);
+            overlay.appendChild(hsRow);
+        }
+
         const row = document.createElement('div');
         row.id = 'game-over-btns';
 
-        // RESTART? — rainbow-glow, 5s auto-countdown → reload straight back into
-        // the 2D world (visitor choice kept, so the gate is skipped).
+        // RESTART? — normally a rainbow-glow 5s auto-countdown reload straight
+        // back into the 2D world. Skipped when a new high score is on the
+        // table so the auto-reload can't yank the initials form away mid-entry
+        // — the player restarts manually once they're done with it.
         const restart = document.createElement('button');
         restart.id = 'restart-btn';
         restart.setAttribute('aria-label', this.t('restartAria'));
-        let secs = 5;
-        const paint = () => { restart.innerHTML = `${this.t('restartLabel')} <span class="restart-secs">${secs}</span>`; };
-        paint();
         const goRestart = () => { clearInterval(this._gameOverTimer); window.location.reload(); };
         restart.addEventListener('click', goRestart);
-        this._gameOverTimer = setInterval(() => {
-            secs -= 1;
+        if (qualifies) {
+            restart.textContent = this.t('restartLabel');
+        } else {
+            let secs = 5;
+            const paint = () => { restart.innerHTML = `${this.t('restartLabel')} <span class="restart-secs">${secs}</span>`; };
             paint();
-            if (secs <= 0) goRestart();
-        }, 1000);
+            this._gameOverTimer = setInterval(() => {
+                secs -= 1;
+                paint();
+                if (secs <= 0) goRestart();
+            }, 1000);
+        }
 
         // EXIT — reload back to the intro.
         const exit = document.createElement('button');
@@ -1838,6 +1989,7 @@ export default class MainScene extends Phaser.Scene {
     destroyHUD() {
         clearTimeout(this._toastTimer);
         clearInterval(this._statsPollTimer);
+        clearInterval(this._leaderboardPollTimer);
         this._stopTutorialParticles();
         if (this._hudEls) this._hudEls.forEach(el => el.remove());
         this._hudEls = [];
@@ -1952,6 +2104,98 @@ export default class MainScene extends Phaser.Scene {
         this._statsLineEl.setAttribute('points', points);
         this._statsPeakEl.textContent = `peak: ${peak}`;
         this._statsTotalEl.textContent = `total users (24h): ${totalUnique24h}`;
+    }
+
+    // ===== Global top-10 leaderboard =====
+    // Lifetime cowboy/cowgirl/zombie kill totals (each already tracked +
+    // persisted client-side — see the constructor's localStorage reads)
+    // self-reported to server/index.js's GET /leaderboard + POST /score.
+    // Same trust model as PvP hit relaying elsewhere in this file: the
+    // server never re-derives these numbers itself, it just clamps + ranks
+    // whatever a client claims — fine for a portfolio game's top-10 list,
+    // not an anti-cheat system.
+    _buildLeaderboardHud() {
+        const wrap = document.createElement('div');
+        wrap.id = 'leaderboard-hud';
+
+        const title = document.createElement('div');
+        title.id = 'lb-title';
+        title.textContent = this.t('lbTitle');
+        wrap.appendChild(title);
+
+        const legend = document.createElement('div');
+        legend.id = 'lb-legend';
+        legend.innerHTML = '<span class="lb-icon lb-icon-cowboy"></span>' +
+            '<span class="lb-icon lb-icon-cowgirl"></span>' +
+            '<span class="lb-icon lb-icon-zombie"></span>';
+        wrap.appendChild(legend);
+
+        const list = document.createElement('div');
+        list.id = 'lb-list';
+        wrap.appendChild(list);
+
+        document.body.appendChild(wrap);
+        this._hudEls.push(wrap);
+        this._lbListEl = list;
+        this._leaderboardCache = [];
+
+        this._fetchLeaderboard();
+        this._leaderboardPollTimer = setInterval(() => this._fetchLeaderboard(), 5 * 60 * 1000);
+    }
+
+    _fetchLeaderboard() {
+        fetch(LEADERBOARD_URL).then(r => (r.ok ? r.json() : null)).then(data => {
+            if (Array.isArray(data)) { this._leaderboardCache = data; this._renderLeaderboard(data); }
+        }).catch(() => {});
+    }
+
+    _renderLeaderboard(list) {
+        if (!this._lbListEl) return;
+        this._lbListEl.innerHTML = '';
+        if (!list.length) {
+            const empty = document.createElement('div');
+            empty.id = 'lb-empty';
+            empty.textContent = this.t('lbEmpty');
+            this._lbListEl.appendChild(empty);
+            return;
+        }
+        list.forEach((entry, i) => {
+            const row = document.createElement('div');
+            row.className = 'lb-row';
+            row.innerHTML = `
+                <div class="lb-row-top">
+                    <span class="lb-rank">${i + 1}.</span>
+                    <span class="lb-name">${entry.name}</span>
+                    <span class="lb-total">${entry.total}</span>
+                </div>
+                <div class="lb-row-breakdown">
+                    <span class="lb-icon lb-icon-cowboy"></span><span class="lb-num lb-num-cowboy">${entry.cowboy}</span>
+                    <span class="lb-icon lb-icon-cowgirl"></span><span class="lb-num lb-num-cowgirl">${entry.cowgirl}</span>
+                    <span class="lb-icon lb-icon-zombie"></span><span class="lb-num lb-num-zombie">${entry.zombie}</span>
+                </div>`;
+            this._lbListEl.appendChild(row);
+        });
+    }
+
+    // Submits this browser's current lifetime kill totals (called from the
+    // new-high-score flow in _showGameOver()) and re-renders the panel with
+    // whatever the server ends up returning — that reflects the real top 10
+    // even if this particular submission didn't end up making the cut.
+    _submitScore(name, cowboy, cowgirl, zombie) {
+        return fetch(SCORE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, cowboy, cowgirl, zombie }),
+        }).then(r => (r.ok ? r.json() : null)).then(data => {
+            if (Array.isArray(data)) { this._leaderboardCache = data; this._renderLeaderboard(data); }
+            return data;
+        }).catch(() => null);
+    }
+
+    _buildShareText(total, cowboy, cowgirl, zombie) {
+        return this.t('shareText')
+            .replace('{total}', total).replace('{cowboy}', cowboy)
+            .replace('{cowgirl}', cowgirl).replace('{zombie}', zombie);
     }
 
     // ===== Dash =====
@@ -2386,11 +2630,12 @@ export default class MainScene extends Phaser.Scene {
         if (this.cowboy && this.cowboy.active) extras.push(this.cowboy);
         if (this.cowgirl && this.cowgirl.active) extras.push(this.cowgirl);
         if (this.inOhs) {
-            return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...this.zombies, ...extras]
-                .filter(e => e && e.active);
+            const ohsList = [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...this.zombies, ...extras];
+            if (this.subWorldId === 'ohs') ohsList.push(this.orb);
+            return ohsList.filter(e => e && e.active);
         }
         const list = this.trees.getChildren().slice();
-        list.push(this.computer, this.computerPreview, this.orb, this.contributeSign, this.ohsSchool, this.brownSchool);
+        list.push(this.computer, this.computerPreview, this.contributeSign, this.ohsSchool, this.brownSchool);
         this.bombs.getChildren().forEach(b => { if (b.active) list.push(b); });
         this.heartPickups.getChildren().forEach(h => { if (h.active) list.push(h); });
         this.zombies.forEach(z => { if (z.active) list.push(z); });
@@ -2404,9 +2649,11 @@ export default class MainScene extends Phaser.Scene {
         if (this.cowboy && this.cowboy.active) foes.push(this.cowboy);
         if (this.cowgirl && this.cowgirl.active) foes.push(this.cowgirl);
         if (this.inOhs) {
-            return [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...foes];
+            const ohsList = [...this.ohsProjectSprites, this.ohsExitSign, ...this.ohsGhosts, ...foes];
+            if (this.subWorldId === 'ohs') ohsList.push(this.orb);
+            return ohsList;
         }
-        return [this.computer, this.orb, this.contributeSign, this.ohsSchool, this.brownSchool, ...this.trees.getChildren(), ...foes];
+        return [this.computer, this.contributeSign, this.ohsSchool, this.brownSchool, ...this.trees.getChildren(), ...foes];
     }
 
     update() {
@@ -3460,10 +3707,10 @@ export default class MainScene extends Phaser.Scene {
         if (this.inOhs) {
             this.ohsProjectSprites.forEach(s => block(s));
             block(this.ohsExitSign);
+            if (this.subWorldId === 'ohs') block(this.orb);
         } else {
             this.trees.getChildren().forEach(t => block(t));
             block(this.computer);
-            block(this.orb);
             block(this.contributeSign);
             block(this.ohsSchool);
             block(this.brownSchool);
@@ -4504,7 +4751,6 @@ export default class MainScene extends Phaser.Scene {
                 });
                 if (!overlap) {
                     if (Phaser.Math.Distance.Between(x, y, this.computer.x, this.computer.y) < 350) overlap = true;
-                    else if (Phaser.Math.Distance.Between(x, y, this.orb.x, this.orb.y) < 150) overlap = true;
                     else if (Phaser.Math.Distance.Between(x, y, this.contributeSign.x, this.contributeSign.y) < 160) overlap = true;
                     else if (Phaser.Math.Distance.Between(x, y, this.ohsSchool.x, this.ohsSchool.y) < 340) overlap = true;
                     else if (Phaser.Math.Distance.Between(x, y, this.brownSchool.x, this.brownSchool.y) < 380) overlap = true;
@@ -4672,6 +4918,13 @@ export default class MainScene extends Phaser.Scene {
         this.ohsExitSign = this.physics.add.staticImage(worldW - 260, worldH - 260, 'exit-sign').setScale(4).refreshBody();
         this.ohsColliders.push(this.physics.add.overlap(this.axe, this.ohsExitSign, this.hitExitSign, null, this));
 
+        // The orb lives specifically in OHS (bottom-left corner), not Brown or
+        // the main world — it's created once in create() at this exact spot
+        // and just shown/hidden here rather than moved.
+        const orbHere = id === 'ohs';
+        this.orb.setVisible(orbHere);
+        if (this.orb.body) this.orb.body.enable = orbHere;
+
         // A few roaming (non-carrying) ghosts.
         for (let i = 0; i < 5; i++) {
             const gx = Phaser.Math.Between(220, worldW - 220);
@@ -4704,6 +4957,8 @@ export default class MainScene extends Phaser.Scene {
         this.ohsGhosts.forEach(g => g.destroy());
         this.ohsGhosts = [];
         if (this.ohsExitSign) { this.ohsExitSign.destroy(); this.ohsExitSign = null; }
+        this.orb.setVisible(false);
+        if (this.orb.body) this.orb.body.enable = false;
 
         this.cameras.main.setBackgroundColor(this._mainBgColor());
         if (this.doomView) this.doomView.setFloorColor && this.doomView.setFloorColor(null);
@@ -4724,7 +4979,6 @@ export default class MainScene extends Phaser.Scene {
         this.trees.getChildren().forEach(set);
         set(this.computer);
         if (this.computerPreview) this.computerPreview.setVisible(on);
-        set(this.orb);
         set(this.contributeSign);
         set(this.ohsSchool);
         set(this.brownSchool);

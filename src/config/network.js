@@ -6,3 +6,8 @@ export const WS_URL = 'wss://ws.bruno-rodriguez-mendez.com';
 // Same origin/box, plain HTTPS — serves the rolling 24h visitor stats (see
 // server/index.js's GET /stats handler).
 export const STATS_URL = 'https://ws.bruno-rodriguez-mendez.com/stats';
+
+// Same origin/box — top-10 kill-count leaderboard (see server/index.js's
+// GET /leaderboard + POST /score handlers).
+export const LEADERBOARD_URL = 'https://ws.bruno-rodriguez-mendez.com/leaderboard';
+export const SCORE_URL = 'https://ws.bruno-rodriguez-mendez.com/score';
