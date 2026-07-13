@@ -1,14 +1,28 @@
 {
-  "name": "pixel-portfolio",
+  "name": "chompixel",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Chompixel — a chaotic pixel-art browser game: chop the field, survive zombie hordes and cowboy duels, then flip the whole world into first-person DOOM mode. Built in Phaser, no build step.",
+  "keywords": [
+    "game",
+    "browser-game",
+    "io-game",
+    "phaser",
+    "pixel-art",
+    "multiplayer",
+    "zombies",
+    "raycaster"
+  ],
+  "homepage": "https://bruno-rodriguez-mendez.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brubru6707/bruno-rodriguez-mendez.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "author": "Bruno Rodriguez-Mendez <brubrurodriguez456@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "python3 -m http.server 8731",
+    "test": "echo \"No automated tests yet — see CONTRIBUTING.md\" && exit 0"
+  },
   "dependencies": {
     "phaser": "^3.88.2"
   }

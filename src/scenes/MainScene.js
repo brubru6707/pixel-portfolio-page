@@ -303,9 +303,9 @@ export default class MainScene extends Phaser.Scene {
         // shape-up and chipathon (GitHub) both refuse to be framed (X-Frame-Options),
         // so those two open in a new tab instead of openSubPage's iframe.
         this.brownProjects = [
-            { key: 'shape-up', label: 'shape up', url: 'https://www.tryshapeup.cc/', newTab: true },
-            { key: 'bloom', label: 'bloom', url: 'https://www.bloom-pots.com/' },
-            { key: 'chipathon', label: 'chipathon 2026', url: 'https://github.com/brubru6707/hungry-chippos-chipathon-2026', newTab: true },
+            { key: 'shape-up', label: 'shape up', url: 'https://www.tryshapeup.cc/', newTab: true, path: 'assets/subdomains/shape-up.png' },
+            { key: 'bloom', label: 'bloom', url: 'https://www.bloom-pots.com/', path: 'assets/subdomains/bloom.png' },
+            { key: 'chipathon', label: 'chipathon 2026', url: 'https://github.com/brubru6707/hungry-chippos-chipathon-2026', newTab: true, path: 'assets/other-projects/chipathon.png' },
         ];
         // Which sub-world we're inside ('ohs' | 'brown' | null). `inOhs` stays
         // as the legacy "inside ANY sub-world" flag used all over the code.
@@ -416,17 +416,34 @@ export default class MainScene extends Phaser.Scene {
         this.load.spritesheet('cowboy', 'assets/cowboy.png', { frameWidth: 20, frameHeight: 30 });
         this.load.spritesheet('cowgirl', 'assets/cow-girl-on-pig.png', { frameWidth: 100, frameHeight: 100 });
 
-        // Brown-world project previews.
-        this.load.image('shape-up', 'assets/subdomains/shape-up.png');
-        this.load.image('bloom', 'assets/subdomains/bloom.png');
-        this.load.image('chipathon', 'assets/other-projects/chipathon.png');
-
         // Image previews (replace the old live iframes) + OHS-world art.
         this.load.image('personal-website', 'assets/subdomains/personal-website.png');
         this.load.image('ohs-school', 'assets/OHS.png');
         this.load.image('exit-sign', 'assets/exit.png');
         this.load.image('contribute-sign', 'assets/contribute.png');
-        this.ohsProjects.forEach(p => this.load.image(p.key, `assets/subdomains/${p.key}.png`));
+
+        // OHS + Brown project preview screenshots (~16MB combined) are NOT
+        // loaded here — most players never chop those schoolhouses open, so
+        // eagerly loading them would triple time-to-first-move for everyone
+        // else. They're fetched on demand in enterOhsWorld/enterBrownWorld
+        // (see _loadSubWorldAssets) the first time a player actually enters.
+    }
+
+    // Fetches any project preview images not already in the texture cache,
+    // reusing the same loading overlay as the initial preload (real progress,
+    // driven by this scene's persistent 'progress' listener from preload()
+    // above — not a fake timer). Calls back once everything's ready; no-ops
+    // straight to the callback if a repeat visit finds everything cached.
+    _loadSubWorldAssets(projects, cb) {
+        const missing = projects.filter(p => !this.textures.exists(p.key));
+        if (!missing.length) { cb(); return; }
+        if (typeof window.showGameLoading === 'function') window.showGameLoading();
+        missing.forEach(p => this.load.image(p.key, p.path));
+        this.load.once('complete', () => {
+            if (typeof window.hideGameLoading === 'function') window.hideGameLoading();
+            cb();
+        });
+        this.load.start();
     }
 
     create() {
@@ -626,7 +643,7 @@ export default class MainScene extends Phaser.Scene {
         // the old live iframe; billboards in 3D too). Chop the computer 3x to open.
         // Sit the preview higher and larger so it covers the computer's screen face
         // (the computer is setScale(15) → ~450×390 on screen).
-        this.computerPreview = this.add.image(this.computer.x, this.computer.y - 95, 'personal-website')
+        this.computerPreview = this.add.image(this.computer.x, this.computer.y - 120, 'personal-website')
             .setScale(0.1).setDepth(6);
         this.miniMap.ignore(this.computerPreview);
 
@@ -967,15 +984,13 @@ export default class MainScene extends Phaser.Scene {
         bottomleft.appendChild(gear);
         this._gearBtn = gear;
 
-        // --- Exit button: clears the saved "who are you?" choice + reloads, so
-        // the visitor gate shows again. ---
+        // --- Exit button: reloads back to the intro. ---
         const exit = document.createElement('button');
         exit.id = 'exit-btn';
         exit.className = 'pixel-hud-btn';
         exit.textContent = this.t('exitLabel');
         exit.setAttribute('aria-label', this.t('exitAria'));
         exit.addEventListener('click', () => {
-            try { localStorage.removeItem('visitorType'); } catch (e) {}
             window.location.reload();
         });
         bottomleft.appendChild(exit);
@@ -1169,6 +1184,13 @@ export default class MainScene extends Phaser.Scene {
 
         document.body.classList.add('hud-ready');
         if (typeof window.hideGameLoading === 'function') window.hideGameLoading();
+
+        // Fire once per session: the player actually reached a playable world.
+        // (posthog.capture only exists once posthog.init runs — i.e. a real key is set.)
+        if (window.posthog && typeof window.posthog.capture === 'function' && !window.__gameStartedTracked) {
+            window.__gameStartedTracked = true;
+            window.posthog.capture('game_started');
+        }
 
         // Show the controls tutorial once on entry.
         if (!this.tutorialShown) this.showTutorial();
@@ -1479,13 +1501,23 @@ export default class MainScene extends Phaser.Scene {
         this._pvpBtn.setAttribute('aria-label', this.t('pvpAria'));
     }
 
-    // Another fighter's hit was forwarded to us — take the damage locally.
+    // Another fighter's hit was forwarded to us — take the damage (and any
+    // knockback) locally. `kb` is the angle THEY were dashing at when they
+    // hit us (radians); we launch ourselves along it, same push as an NPC
+    // gets from the same move (see _dashKnockback) and same decay-to-rest
+    // mechanic as a bomb launch (the shared `_knockbackUntil` window in
+    // update()/updateDoomMovement()).
     _onPvpHit(msg) {
         if (!this.pvpEnabled) return; // safety: server shouldn't forward, but guard
         const dmg = Math.max(0, Math.min(3, Number(msg && msg.dmg) || 0));
         if (dmg <= 0) return;
         this.cameras.main.shake(120, 0.008);
         this.damage(dmg);
+        const kb = msg && msg.kb;
+        if (typeof kb === 'number' && Number.isFinite(kb)) {
+            this.player.setVelocity(Math.cos(kb) * this.DASH_KNOCKBACK_SPEED, Math.sin(kb) * this.DASH_KNOCKBACK_SPEED);
+            this._knockbackUntil = this.time.now + this.DASH_KNOCKBACK_STUN;
+        }
     }
 
     // Main-world camera background: black in dark mode, dark grey in light mode
@@ -1713,14 +1745,13 @@ export default class MainScene extends Phaser.Scene {
             if (secs <= 0) goRestart();
         }, 1000);
 
-        // EXIT — clear the saved "who are you?" choice + reload → visitor gate.
+        // EXIT — reload back to the intro.
         const exit = document.createElement('button');
         exit.id = 'game-over-exit';
         exit.textContent = this.t('exitLabel');
         exit.setAttribute('aria-label', this.t('exitGameAria'));
         exit.addEventListener('click', () => {
             clearInterval(this._gameOverTimer);
-            try { localStorage.removeItem('visitorType'); } catch (e) {}
             window.location.reload();
         });
 
@@ -2037,6 +2068,24 @@ export default class MainScene extends Phaser.Scene {
                 this._dashHitSet.add(foe);
                 this._dashKnockback(foe, angle);
             }
+
+            // PvP: dashing into a fellow fighter's ghost knocks THEM back too —
+            // same cone/range test, but we don't own their movement, so it's a
+            // network message (see _dashKnockbackRemote) instead of a direct
+            // setVelocity like the NPC case above.
+            if (this.pvpEnabled && !this.inOhs && this.remotePlayers && this.remotePlayers.length) {
+                for (const rp of this.remotePlayers) {
+                    if (!rp.pvp || rp.spectator || !rp.sprite || this._dashHitSet.has(rp.id)) continue;
+                    const dx = rp.sprite.x - this.player.x, dy = rp.sprite.y - this.player.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > this.DASH_SHIELD_RANGE) continue;
+                    const rawRel = Math.atan2(dy, dx) - angle;
+                    const rel = Math.atan2(Math.sin(rawRel), Math.cos(rawRel));
+                    if (Math.abs(rel) > this.DASH_SHIELD_HALF_ANGLE) continue;
+                    this._dashHitSet.add(rp.id);
+                    this._dashKnockbackRemote(rp, angle);
+                }
+            }
         } catch (e) {
             console.error('dash shield update failed (non-fatal, skipping this frame):', e);
         }
@@ -2060,6 +2109,27 @@ export default class MainScene extends Phaser.Scene {
         if (this.doomView && this.doomView.active) {
             this.doomView.burstAtWorld(foe.x, foe.y, { colors: ['#c6ff33', '#ffffff', '#8fd424'], count: 20 });
         }
+    }
+
+    // PvP counterpart to _dashKnockback: we can't setVelocity on a remote
+    // player's real body (they own their own physics), so the hit + dash
+    // angle go over the network — the target applies the knockback to
+    // itself on arrival (see _onPvpHit). Everything here is local-only
+    // feedback (FX/sound on our copy of their ghost); their actual HP and
+    // shove happen on their machine once the server relays it.
+    _dashKnockbackRemote(rp, angle) {
+        const now = this.time.now;
+        if (now < (this._pvpHitCooldown[rp.id] || 0)) return;
+        this._pvpHitCooldown[rp.id] = now + 400;
+        this._network.sendHit(rp.id, this.DASH_DAMAGE, angle);
+        this.sounds.smash();
+        this.cameras.main.shake(160, 0.01);
+        this._pixelBurst(rp.sprite.x, rp.sprite.y, {
+            colors: [0xc6ff33, 0xffffff, 0x8fd424],
+            count: 24, minSpeed: 180, maxSpeed: 420, gravity: 300
+        });
+        rp.sprite.setTint(0xff5a5a);
+        this.time.delayedCall(120, () => { if (rp.sprite && rp.sprite.active) rp.sprite.setTint(rp.tint); });
     }
 
     // Dash ended (or never started this frame) — fade out + clean up the
@@ -4531,21 +4601,27 @@ export default class MainScene extends Phaser.Scene {
     }
 
     enterOhsWorld() {
-        this._enterSubWorld('ohs', {
-            projects: this.ohsProjects.map(p => ({
-                key: p.key, label: p.label,
-                url: `https://${p.key}.bruno-rodriguez-mendez.com`
-            })),
-            bg: '#33343a', // dark cement
-            toast: 'Welcome to OHS!\nChop a project to open it — hit the EXIT sign to leave.'
+        const projects = this.ohsProjects.map(p => ({
+            key: p.key, label: p.label,
+            url: `https://${p.key}.bruno-rodriguez-mendez.com`,
+            path: `assets/subdomains/${p.key}.png`
+        }));
+        this._loadSubWorldAssets(projects, () => {
+            this._enterSubWorld('ohs', {
+                projects,
+                bg: '#33343a', // dark cement
+                toast: 'Welcome to OHS!\nChop a project to open it — hit the EXIT sign to leave.'
+            });
         });
     }
 
     enterBrownWorld() {
-        this._enterSubWorld('brown', {
-            projects: this.brownProjects,
-            bg: '#4e3629', // Brown University brown
-            toast: 'Welcome to BROWN!\nChop a project to open it — hit the EXIT sign to leave.'
+        this._loadSubWorldAssets(this.brownProjects, () => {
+            this._enterSubWorld('brown', {
+                projects: this.brownProjects,
+                bg: '#4e3629', // Brown University brown
+                toast: 'Welcome to BROWN!\nChop a project to open it — hit the EXIT sign to leave.'
+            });
         });
     }
 
@@ -4787,6 +4863,7 @@ export default class MainScene extends Phaser.Scene {
     // the player exactly where they were.
     openSubPage(url, ghost = null) {
         if (this.activeSubPage) return;
+        if (window.posthog && typeof window.posthog.capture === 'function') window.posthog.capture('subpage_open', { url });
 
         // The HUD is about to be hidden, so its buttons can't fire pointerup —
         // clear held state or it would auto-chop/auto-walk on return.

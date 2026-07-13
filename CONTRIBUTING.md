@@ -1,7 +1,8 @@
-# Contributing
+# Contributing to Chompixel
 
-Thanks for considering a contribution to Pixel Portfolio. This is a personal portfolio project first,
-but bug fixes, polish, and small features are welcome.
+Thanks for considering a contribution. Chompixel is a game first (with its creator's portfolio woven
+in as hidden worlds) — new enemies, weapons, sub-worlds, translations, bug fixes, and polish are all
+welcome.
 
 ## Before you start
 

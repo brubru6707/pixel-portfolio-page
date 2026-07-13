@@ -20,6 +20,17 @@
     <meta name="twitter:description" content="Hey! Welcome to my portfolio — it's actually a game. Chop trees, go 3D, poke around my projects. Have fun!">
     <meta name="twitter:image" content="https://bruno-rodriguez-mendez.com/assets/subdomains/personal-website.png">
     <link rel="icon" href="/assets/brubru.jpg" type="image/jpeg">
+    <!-- PostHog product analytics (free on the GitHub Student pack: posthog.com/students).
+         Paste your Project API key into POSTHOG_KEY below; until you do, this is inert
+         (no network calls). Autocapture gives pageviews, sources, and retention; custom
+         events like 'game_started' / 'switch_to_pixel' / 'subpage_open' build funnels. -->
+    <script>
+      !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+      var POSTHOG_KEY = 'phc_w4ZDizoXdsW4E223GmU64ooZrs8R6RMQH6wV6LpwMWFD'; // PostHog project 509521 (US)
+      if (POSTHOG_KEY.indexOf('YOUR') === -1) {
+        posthog.init(POSTHOG_KEY, { api_host: 'https://us.i.posthog.com', person_profiles: 'identified_only' });
+      }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -1229,117 +1240,6 @@
         }
 
         /* ============================================================
-           Visitor gate — "Who are you?" splash shown before entry.
-           Default: clean regular font. Hovering "Everyone Else" flips
-           the whole message to the pixel font and sprays rainbow pixels.
-           ============================================================ */
-        #visitor-gate {
-            position: fixed;
-            inset: 0;
-            z-index: 9000;
-            display: none;   /* hidden until the intro animation finishes (.shown) */
-            align-items: center;
-            justify-content: center;
-            background: #000;
-            transition: opacity 0.45s ease;
-        }
-        #visitor-gate.shown { display: flex; }
-        #visitor-gate.hidden { opacity: 0; pointer-events: none; }
-        .gate-inner {
-            text-align: center;
-            padding: 40px 48px;
-            max-width: 90vw;
-            border: 4px solid #c6ff33;      /* axe-icon green frame around the message */
-            border-radius: 0;
-            box-shadow: 8px 8px 0 #000;
-        }
-        .gate-title {
-            color: #f5f5f5;
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: clamp(28px, 7vw, 64px);
-            font-weight: 700;
-            margin: 0 0 40px;
-            letter-spacing: 0.5px;
-            position: relative;
-            /* Fixed height so the font/size swap in pixel mode doesn't shift the
-               buttons below it (a source of the corner-hover flicker). */
-            min-height: 84px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .gate-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .gate-btn {
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-            font-size: clamp(15px, 3.4vw, 22px);
-            font-weight: 600;
-            color: #f5f5f5;
-            background: transparent;
-            border: 2px solid #f5f5f5;
-            border-radius: 0;
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s, transform 0.1s;
-            /* Fixed box so switching to the wide pixel font never reflows the
-               button — that reflow is what made the corner hover spaz. */
-            box-sizing: border-box;
-            min-width: 260px;
-            height: 66px;
-            padding: 0 26px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            white-space: nowrap;   /* keep "Regular, but with PIXELS" on one line */
-        }
-        .gate-btn:hover { background: #f5f5f5; color: #05050a; }
-        .gate-btn:active { transform: translateY(2px); }
-        /* Two portfolios: "Regular" (red) → the plain personal site; "Regular,
-           but with PIXELS" (blue/green) → down the rabbit hole into the game. */
-        .gate-btn--recruiter { border-color: #ff4d4d; color: #ff4d4d; }
-        .gate-btn--recruiter:hover { background: #ff4d4d; color: #05050a; }
-        .gate-btn--everyone { border-color: #4da6ff; color: #4da6ff; }
-        .gate-btn--everyone:hover { background: #4da6ff; color: #05050a; }
-
-        /* Pixel mode — applied to the whole gate while "Everyone Else" is hovered */
-        #visitor-gate.gate-pixel .gate-title,
-        #visitor-gate.gate-pixel .gate-btn {
-            font-family: "Press Start 2P", monospace;
-            letter-spacing: 0;
-        }
-        #visitor-gate.gate-pixel .gate-title {
-            font-size: clamp(20px, 5vw, 46px);
-            text-shadow: 3px 3px 0 #000;
-        }
-        #visitor-gate.gate-pixel .gate-btn {
-            font-size: clamp(11px, 2.6vw, 18px);
-            box-shadow: 4px 4px 0 #000;
-        }
-        #visitor-gate.gate-pixel .gate-btn--everyone {
-            border-color: #c6ff33;
-            color: #c6ff33;
-        }
-        #visitor-gate.gate-pixel .gate-btn--everyone:hover {
-            background: #c6ff33; color: #05050a;
-        }
-
-        /* Rainbow pixels that shoot out of the words on hover */
-        .gate-spark {
-            position: fixed;
-            image-rendering: pixelated;
-            pointer-events: none;
-            z-index: 9001;
-            animation: gateSparkFly 0.75s ease-out forwards;
-        }
-        @keyframes gateSparkFly {
-            0%   { opacity: 1; transform: translate(0, 0) scale(1); }
-            100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, -40px)) scale(0.2); }
-        }
-
-        /* ============================================================
            Game loading overlay — covers the black canvas gap while
            MainScene.preload() pulls in its spritesheets. A pixel dial
            (8 blocks lighting up in sequence, rainbow-coded) plus a real
@@ -1489,102 +1389,41 @@
             border-color: #2d6b1c;
             box-shadow: 3px 3px 0 #000, 0 0 10px rgba(45, 107, 28, 0.4);
         }
+        /* Remaining neon-green chrome that the block above missed: the persistent
+           2D⇄3D toggle, the Game Modes panel, the settings help chip, and the
+           modal close — all recolored to the same dark-green-on-cream look. */
+        body.theme-light #mode-toggle {
+            color: #2d6b1c;
+            background: #f4f7e8;
+            border-color: #2d6b1c;
+        }
+        body.theme-light .settings-help {
+            color: #2d6b1c;
+            border-color: #2d6b1c;
+        }
+        body.theme-light #modal-close {
+            color: #2d6b1c;
+            border-color: #2d6b1c;
+        }
+        body.theme-light .modes-card {
+            background: #f4f7e8;
+            border-color: #2d6b1c;
+            color: #2d2d3a;
+        }
+        body.theme-light .modes-card h2 { color: #2d6b1c; }
+        body.theme-light .modes-note { color: #6a6a78; }
+        body.theme-light .mode-row { background: #ffffff; border-color: #b8c8a8; }
+        body.theme-light .mode-name { color: #2d6b1c; }
+        body.theme-light .vote-btn { background: #ffffff; border-color: #b8c8a8; }
+        body.theme-light .vote-btn .vote-count { color: #2d2d3a; }
+        body.theme-light .modes-close {
+            background: #2d6b1c;
+            color: #f4f7e8;
+        }
     </style>
 </head>
 <body>
     <!-- Visitor gate: shown before entry unless a choice is already saved -->
-    <div id="visitor-gate">
-        <div class="gate-inner">
-            <h1 class="gate-title">which portfolio:</h1>
-            <div class="gate-buttons">
-                <button class="gate-btn gate-btn--recruiter" data-visitor="recruiter">Regular</button>
-                <button class="gate-btn gate-btn--everyone" data-visitor="everyone">Regular, but with PIXELS</button>
-            </div>
-        </div>
-    </div>
-    <script>
-        (function () {
-            var gate = document.getElementById('visitor-gate');
-            var PERSONAL = 'personalWebsite/index.html';
-            // NOTE: routing on load lives in IntroScene now — the intro animation
-            // always plays first, and only when it finishes is this gate revealed
-            // (via window.showVisitorGate, below) or the saved choice auto-routed.
-            var title = gate.querySelector('.gate-title');
-            var everyone = gate.querySelector('.gate-btn--everyone');
-            var rainbow = ['#ff2d55', '#ff9500', '#ffe500', '#34d158', '#00c7ff', '#5e5ce6', '#ff2dd4'];
-            var sparkTimer = null;
-            var everyoneCb = null;   // set by showVisitorGate: starts the game
-
-            // Spray rainbow pixels from around the title + the hovered button.
-            function spawnSparks() {
-                if (!gate.classList.contains('gate-pixel')) return;
-                [title, everyone].forEach(function (el) {
-                    var r = el.getBoundingClientRect();
-                    var per = 2 * (r.width + r.height);
-                    for (var i = 0; i < 3; i++) {
-                        var d = Math.random() * per, x, y, nx, ny;
-                        if (d < r.width) { x = r.left + d; y = r.top; nx = 0; ny = -1; }
-                        else if (d < r.width + r.height) { x = r.right; y = r.top + (d - r.width); nx = 1; ny = 0; }
-                        else if (d < 2 * r.width + r.height) { x = r.right - (d - r.width - r.height); y = r.bottom; nx = 0; ny = 1; }
-                        else { x = r.left; y = r.bottom - (d - 2 * r.width - r.height); nx = -1; ny = 0; }
-                        var p = document.createElement('div');
-                        p.className = 'gate-spark';
-                        var size = 3 + Math.floor(Math.random() * 5);
-                        p.style.width = p.style.height = size + 'px';
-                        var col = rainbow[Math.floor(Math.random() * rainbow.length)];
-                        p.style.background = col;
-                        p.style.boxShadow = '0 0 6px ' + col;
-                        p.style.left = x + 'px';
-                        p.style.top = y + 'px';
-                        var dist = 16 + Math.random() * 40, spread = (Math.random() - 0.5) * 30;
-                        p.style.setProperty('--dx', (nx * dist + (ny !== 0 ? spread : 0)).toFixed(0) + 'px');
-                        p.style.setProperty('--dy', (ny * dist + (nx !== 0 ? spread : 0)).toFixed(0) + 'px');
-                        p.addEventListener('animationend', function () { this.remove(); });
-                        document.body.appendChild(p);
-                    }
-                });
-            }
-
-            everyone.addEventListener('mouseenter', function () {
-                gate.classList.add('gate-pixel');
-                clearInterval(sparkTimer);
-                sparkTimer = setInterval(spawnSparks, 70);
-                spawnSparks();
-            });
-            everyone.addEventListener('mouseleave', function () {
-                gate.classList.remove('gate-pixel');
-                clearInterval(sparkTimer);
-                sparkTimer = null;
-            });
-
-            function choose(type) {
-                try { localStorage.setItem('visitorType', type); } catch (e) {}
-                clearInterval(sparkTimer);
-                if (type === 'recruiter') {
-                    // Straight to the personal site (rendered without the pixel font).
-                    window.location.href = PERSONAL;
-                    return;
-                }
-                // Everyone Else: fade the gate out, then start the game.
-                gate.classList.add('hidden');
-                setTimeout(function () {
-                    gate.remove();
-                    if (typeof everyoneCb === 'function') everyoneCb();
-                }, 500);
-            }
-            gate.querySelectorAll('.gate-btn').forEach(function (b) {
-                b.addEventListener('click', function () { choose(b.dataset.visitor); });
-            });
-
-            // Called by IntroScene once the intro animation completes (first-time
-            // visitors only). Reveals the gate and remembers how to start the game.
-            window.showVisitorGate = function (onEveryone) {
-                everyoneCb = onEveryone || null;
-                gate.classList.add('shown');
-            };
-        })();
-    </script>
-
     <!-- Game loading overlay: shown while MainScene.preload() fetches its
          spritesheets, hidden once the world HUD is built (hud-ready). -->
     <div id="game-loading">

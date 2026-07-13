@@ -36,26 +36,11 @@ export default class IntroScene extends Phaser.Scene {
         });
     }
 
-    // The intro always plays first. Only once it finishes do we route: a
-    // returning visitor goes straight to their saved choice; a first-timer
-    // gets the "Who are you?" gate (which then starts the game or redirects).
+    // Chompixel is a game first, so the field is the front door for EVERYONE —
+    // no "who are you?" gate. Recruiters reach the portfolio by chopping the
+    // in-world computer, or by opening personalWebsite/index.html directly (the
+    // résumé link), which has its own "Pixel version" button back into the game.
     _afterIntro() {
-        let saved = null;
-        try { saved = localStorage.getItem('visitorType'); } catch (e) {}
-
-        if (saved === 'recruiter') {
-            window.location.replace('personalWebsite/index.html');
-            return;
-        }
-        if (saved === 'everyone') {
-            this.scene.start('MainScene');
-            return;
-        }
-        // First visit: reveal the gate. It starts the game on "Everyone Else".
-        if (typeof window.showVisitorGate === 'function') {
-            window.showVisitorGate(() => this.scene.start('MainScene'));
-        } else {
-            this.scene.start('MainScene');
-        }
+        this.scene.start('MainScene');
     }
 }

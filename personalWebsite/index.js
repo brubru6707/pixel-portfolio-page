@@ -1,21 +1,11 @@
 const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // When this page is opened standalone (recruiter path) rather than embedded in
-// the game's iframe, render it in a clean sans-serif (drop the pixel font) and
-// show an Exit button that clears the saved choice and returns to the gate.
+// the game's iframe, render it in a clean sans-serif (drop the pixel font).
+// Returning to the game is handled by the "Pixel version" button (#pixel-toggle,
+// in index.html) rather than here.
 if (window.self === window.top) {
     document.documentElement.classList.add('recruiter-view');
-    window.addEventListener('DOMContentLoaded', function () {
-        const exit = document.createElement('button');
-        exit.id = 'recruiter-exit';
-        exit.type = 'button';
-        exit.textContent = 'Exit';
-        exit.addEventListener('click', function () {
-            try { localStorage.removeItem('visitorType'); } catch (e) {}
-            window.location.href = '../index.html';
-        });
-        document.body.appendChild(exit);
-    });
 }
 
 

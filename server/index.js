@@ -223,15 +223,20 @@ wss.on('connection', (ws, req) => {
 
         // Player claims to have struck another player. Only forwarded (never
         // trusted for authoritative HP) — and only when BOTH sides opted into
-        // PvP and neither is spectating. The target applies the damage locally.
+        // PvP and neither is spectating. The target applies the damage (and
+        // any knockback) locally. `kb` is an optional launch angle in radians
+        // (e.g. a dash-into-player hit) — passed through as-is, same
+        // never-trusted-just-relayed treatment as `dmg`.
         if (msg.type === 'hit') {
             const target = players.get(msg.target);
             if (!target || target.id === player.id) return;
             if (!player.pvp || player.spectator || !target.pvp || target.spectator) return;
             const dmg = Math.max(0, Math.min(3, Number(msg.dmg) || 0));
             if (dmg <= 0) return;
+            const payload = { type: 'hit', from: player.num, dmg };
+            if (typeof msg.kb === 'number' && Number.isFinite(msg.kb)) payload.kb = msg.kb;
             if (target.ws.readyState === target.ws.OPEN) {
-                target.ws.send(JSON.stringify({ type: 'hit', from: player.num, dmg }));
+                target.ws.send(JSON.stringify(payload));
             }
             return;
         }

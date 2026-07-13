@@ -26,30 +26,6 @@ html.recruiter-view {
    clean and professional. */
 html.recruiter-view body { font-size: 1.15em; line-height: 1.7em; }
 
-/* Exit button shown only on the standalone recruiter view */
-#recruiter-exit {
-    position: fixed;
-    bottom: 18px;
-    right: 18px;
-    z-index: 2000;
-    padding: 10px 20px;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--fColor);
-    background: rgba(0, 0, 0, 0.7);
-    border: 2px solid var(--fColor);
-    border-radius: 8px;
-    cursor: pointer;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    transition: background 0.2s, color 0.2s;
-}
-#recruiter-exit:hover {
-    background: var(--subMain2);
-    color: var(--fColor);
-}
-
 header{
     z-index: 1000;
     --space: 20px;

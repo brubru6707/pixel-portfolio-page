@@ -78,7 +78,13 @@ export default class NetworkManager {
     sendPvp(on, spectator) { return this._send({ type: 'pvp', on: !!on, spectator: !!spectator }); }
 
     // Tell the server we struck another player; it forwards to that target.
-    sendHit(targetId, dmg) { return this._send({ type: 'hit', target: targetId, dmg }); }
+    // kbAngle (radians, optional) is the direction to launch them — e.g. the
+    // dash direction when the hit was a dash-into-player collision.
+    sendHit(targetId, dmg, kbAngle) {
+        const payload = { type: 'hit', target: targetId, dmg };
+        if (typeof kbAngle === 'number' && Number.isFinite(kbAngle)) payload.kb = kbAngle;
+        return this._send(payload);
+    }
 
     destroy() {
         this._destroyed = true;
