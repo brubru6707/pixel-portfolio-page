@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chompixel</title>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #05050a;
+        overflow: hidden;
+    }
+    /* The real game — everything actually runs on the live site, this page
+       just frames it so it shows up as "playable in browser" on itch. */
+    #game-frame {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+    }
+
+    /* Loading state, shown until the iframe fires 'load'. */
+    #stub-loading {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #05050a;
+        color: #c6ff33;
+        font-family: "Press Start 2P", monospace;
+        text-align: center;
+        padding: 20px;
+        box-sizing: border-box;
+        transition: opacity 0.4s ease;
+        z-index: 10;
+    }
+    #stub-loading.hidden { opacity: 0; pointer-events: none; }
+    #stub-dial {
+        display: flex;
+        gap: 6px;
+    }
+    #stub-dial span {
+        width: 12px;
+        height: 12px;
+        background: #2d2d3a;
+        border: 2px solid #c6ff33;
+        animation: stubBlink 1.1s infinite;
+    }
+    #stub-dial span:nth-child(2) { animation-delay: 0.15s; }
+    #stub-dial span:nth-child(3) { animation-delay: 0.3s; }
+    #stub-dial span:nth-child(4) { animation-delay: 0.45s; }
+    @keyframes stubBlink {
+        0%, 100% { background: #2d2d3a; }
+        50% { background: #c6ff33; }
+    }
+    #stub-loading p {
+        font-size: 11px;
+        line-height: 1.8;
+        max-width: 480px;
+        margin: 0;
+    }
+
+    /* Fallback, shown only if the iframe fails to load within the timeout
+       (e.g. the live site starts sending framing headers itch can't embed). */
+    #stub-fallback {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 11;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        background: #05050a;
+        color: #f5f5f5;
+        font-family: "Press Start 2P", monospace;
+        text-align: center;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    #stub-fallback.shown { display: flex; }
+    #stub-fallback a {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        color: #05050a;
+        background: #c6ff33;
+        border: 3px solid #000;
+        box-shadow: 4px 4px 0 #000;
+        padding: 12px 24px;
+        text-decoration: none;
+    }
+    #stub-fallback a:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #000; }
+</style>
+</head>
+<body>
+
+    <div id="stub-loading">
+        <div id="stub-dial"><span></span><span></span><span></span><span></span></div>
+        <p>loading chompixel&hellip;</p>
+    </div>
+
+    <div id="stub-fallback">
+        <p style="font-size:12px; line-height:1.8; max-width:480px;">Having trouble loading here?</p>
+        <a href="https://bruno-rodriguez-mendez.com/" target="_blank" rel="noopener">Play on bruno-rodriguez-mendez.com &rarr;</a>
+    </div>
+
+    <iframe
+        id="game-frame"
+        src="https://bruno-rodriguez-mendez.com/index.html"
+        title="Chompixel — chop, survive, and flip to first-person DOOM mode"
+        allow="autoplay; fullscreen; gamepad"
+        loading="eager"
+    ></iframe>
+
+    <script>
+        (function () {
+            var frame = document.getElementById('game-frame');
+            var loading = document.getElementById('stub-loading');
+            var fallback = document.getElementById('stub-fallback');
+            var loaded = false;
+
+            frame.addEventListener('load', function () {
+                loaded = true;
+                loading.classList.add('hidden');
+                setTimeout(function () { loading.remove(); }, 500);
+            });
+
+            // If the live site refuses to be framed (or the network hiccups),
+            // the iframe never fires 'load' with real content — fall back to
+            // a direct link instead of leaving players staring at the dial.
+            setTimeout(function () {
+                if (!loaded) {
+                    loading.classList.add('hidden');
+                    fallback.classList.add('shown');
+                }
+            }, 12000);
+        })();
+    </script>
+
+</body>
+</html>
